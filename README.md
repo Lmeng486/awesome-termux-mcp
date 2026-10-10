@@ -14,7 +14,7 @@ Most MCP (Model Context Protocol) servers assume a PC with Docker and Node. Almo
 
 | Project | Tools | Badge | Notes |
 |---|---|---|---|
-| [nano-mcp-system (this repo)](./nano) | 1+ | ✅ | Zero-dependency, stdlib-only, protocol-loop tested |
+| [nano-mcp-system (this repo)](./nano) | 1+ | ✅ | Verified on device — 13/13 checks, battery via termux-api |
 | Termux-API-Tools-MCP-Server | battery/sms/camera | ⚠️ | Requires Termux + Termux:API from same source (F-Droid) |
 | htekdev/phone-mcp-server | 18 | ⚠️ | Same-source install requirement |
 | xlisp/termux-mcp-server | 45+ | ⚠️ | Broad Termux API surface |
@@ -43,8 +43,23 @@ Protocol surface (minimal promise, maximum compatibility):
 - `ping` → `{}`
 - `tools/list` → tool cards with `name` / `description` / `inputSchema`
 - `tools/call` → `{"content": [{"type": "text", "text": "<serialized JSON>"}]}`
-
 First tool: **`device_status`** — aggregates battery / storage / arch / memory with a **graceful degradation ladder**: `termux-battery-status` → sysfs → `"source": "unavailable"`. A missing sensor never crashes the tool call; the agent always gets usable JSON.
+
+## Verified on Device (real hardware report)
+
+**Device:** Xiaomi `23013RK75C` · Android 15 (SDK 35) · aarch64
+**Environment:** Termux `0.118.3` (GitHub release) · Termux:API app `0.53.0` · Python `3.14.6`
+
+- `test_client.py`: **13/13 PASS** on-device (version negotiation, error codes, stderr/stdout hygiene, degradation ladder)
+- `device_status` real output (battery via **highest ladder rung `termux-api`**):
+  ```json
+  {"battery": {"percent": 60, "source": "termux-api"},
+   "storage": {"source": "df", "raw": "/dev/block/dm-58 462G 365G 97G 79%"},
+   "arch": "aarch64",
+   "memory": {"source": "free", "raw": "Mem: 15152 total / 3559 avail"}}
+  ```
+- Proot (simulated) vs device contrast: in proot the battery rung falls through to `unavailable`; on real Termux the full ladder up to `termux-api` works — exactly the graceful degradation the design promises.
+
 
 ## Runtime Survival Guide (read before you connect anything)
 

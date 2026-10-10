@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Simulated MCP client — covers version negotiation & graceful degradation."""
-import json, subprocess, sys
+import json, os, subprocess, sys
 
-SRV = ["python3", "-u", "/root/awesome-termux-mcp/nano/nano-mcp-system.py"]
+_HERE = os.path.dirname(os.path.abspath(__file__))
+SRV = [os.environ.get("MCP_PYTHON", sys.executable),
+       os.environ.get("MCP_SERVER", os.path.join(_HERE, "nano-mcp-system.py"))]
 
 def talk(reqs):
     return talk_raw([json.dumps(r) for r in reqs])
@@ -11,6 +13,9 @@ def talk_raw(lines):
     p = subprocess.run(SRV, input="\n".join(lines) + "\n",
                        capture_output=True, text=True, timeout=20)
     resp = [json.loads(l) for l in p.stdout.splitlines() if l.strip()]
+    if not resp:
+        sys.stderr.write("[test-client] server returned nothing; rc=%s stderr=%r\n" % (p.returncode, p.stderr))
+        raise SystemExit(2)
     return resp, p.stderr
 
 checks = []
@@ -38,8 +43,8 @@ check("tools/list ok", resp[2]["result"]["tools"][0]["name"] == "device_status")
 bat = json.loads(resp[3]["result"]["content"][0]["text"]).get("battery", {})
 check("tools/call content type text",
       resp[3]["result"]["content"][0]["type"] == "text")
-check("battery degraded to sysfs/sysfs-uevent/unavailable",
-      bat.get("source") in ("sysfs", "sysfs-uevent", "unavailable"))
+check("battery source in full degradation ladder",
+      bat.get("source") in ("termux-api", "sysfs", "sysfs-uevent", "unavailable"))
 
 # --- scenario B: client sends 2025-06-18 -> echoed back ---
 resp2, _ = talk([{"jsonrpc": "2.0", "id": 1, "method": "initialize",
