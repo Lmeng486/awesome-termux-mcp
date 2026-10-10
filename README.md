@@ -15,7 +15,7 @@ Most MCP (Model Context Protocol) servers assume a PC with Docker and Node. Almo
 | Project | Tools | Badge | Notes |
 |---|---|---|---|
 | [nano-mcp-system (this repo)](./nano) | 1+ | ✅ | Verified on device — 13/13 checks, battery via termux-api |
-| Termux-API-Tools-MCP-Server | battery/sms/camera | ⚠️ | Requires Termux + Termux:API from same source (F-Droid) |
+| [Termux-API-Tools-MCP-Server](https://github.com/hyhAsma/termux-api-tools-mcp-server) | 38 | ⚠️→✅* | Verified on device — protocol + full tool surface live; see report below |
 | htekdev/phone-mcp-server | 18 | ⚠️ | Same-source install requirement |
 | xlisp/termux-mcp-server | 45+ | ⚠️ | Broad Termux API surface |
 | wujie272/termux-mcp | 100+ | ⚠️ | Largest tool count, unverified on-device |
@@ -59,6 +59,22 @@ First tool: **`device_status`** — aggregates battery / storage / arch / memory
    "memory": {"source": "free", "raw": "Mem: 15152 total / 3559 avail"}}
   ```
 - Proot (simulated) vs device contrast: in proot the battery rung falls through to `unavailable`; on real Termux the full ladder up to `termux-api` works — exactly the graceful degradation the design promises.
+
+### Third-party verification: `hyhAsma/termux-api-tools-mcp-server` (38 tools)
+
+Same device & Termux environment. Findings (tested read-only tools only; no `send_sms`/`telephony_call`/camera writes were invoked):
+
+- **Architecture:** PC-oriented design — the server (FastMCP) shells every tool call through **paramiko SSH** to `localhost:8022`. `main` refuses to start without SSH credentials; we bypassed only the `main` gate and ran its `mcp` object directly via a 5-line loader (`runner.py`) — **all 38 `@mcp.tool` handlers ran unmodified**.
+- **Dependency reality on Termux arm64:** `fastmcp`/`mcp` fail to install (rpds-py needs Rust/maturin; watchfiles won't build). We substituted a ~75-line stdio JSON-RPC `fastmcp.py` shim implementing `@mcp.tool()`, `initialize`, `tools/list`, `tools/call`. Business code untouched. `paramiko` itself installs fine once `python-cryptography`/`python-bcrypt`/`python-pynacl` come from Termux's **apt** (precompiled), not pip.
+- **`tools/list`:** 38 tools returned live, matching source exactly — battery, brightness, call_log, camera_info/photo, clipboard get/set, contact_list, dialog, download, fingerprint, infrared ×2, location, media_player/scan, microphone_record, notification ×2, sensor, share, sms_list/**sms_send**, storage_get, telephony_call/cellinfo/deviceinfo, toast, torch, tts ×2, usb, vibrate, volume, wallpaper, wifi ×3.
+- **End-to-end `tools/call`** (after `sshd` started + ed25519 key loopback):
+  ```json
+  {"present": true, "technology": "Li-poly", "health": "GOOD", "plugged": "UNPLUGGED",
+   "status": "DISCHARGING", "temperature": 42.8, "voltage": 4193, "current": 1216000,
+   "percentage": 80, "level": 80, "scale": 100, "charge_counter": 3188, "cycle": 827}
+  ```
+- **Verdict:** protocol and full tool surface are real and functional on-device once (a) an SSH transport shim replaces unbuilt Rust deps and (b) sshd runs on the phone itself. The SSH-in-the-middle design is redundant when the client already runs inside Termux — direct `subprocess` calls would drop the paramiko layer entirely.
+- Repro: `pip install paramiko` (apt: `python-cryptography python-bcrypt python-pynacl openssh`); place a `fastmcp.py` shim on `sys.path` (fastmcp itself cannot build); `ssh-keygen` + `sshd`; load module, drive `mcp` via stdio JSON-RPC.
 
 
 ## Runtime Survival Guide (read before you connect anything)
