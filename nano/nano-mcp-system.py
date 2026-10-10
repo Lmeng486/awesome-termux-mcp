@@ -11,7 +11,15 @@ Design rules (see README):
 """
 import json, subprocess, sys
 
-PROTOCOL_VERSION = "2025-06-18"
+SUPPORTED_VERSIONS = ["2025-06-18", "2025-11-25"]
+
+
+def negotiate_version(client_version):
+    """Echo the client's version when we support it; otherwise answer with the
+    highest version we support and let the client decide to downgrade/abort."""
+    if client_version in SUPPORTED_VERSIONS:
+        return client_version
+    return SUPPORTED_VERSIONS[-1]
 
 
 def log(msg):
@@ -39,7 +47,7 @@ def run(cmd, timeout=5):
 def tool_device_status(_args):
     out = {"battery": None, "storage": None, "arch": None, "memory": None}
 
-    # battery: termux-api -> sysfs -> unavailable
+    # battery: termux-api -> sysfs capacity -> sysfs uevent -> unavailable
     raw = run("termux-battery-status")
     if raw:
         try:
@@ -48,9 +56,19 @@ def tool_device_status(_args):
         except Exception:
             pass
     if out["battery"] is None:
+        # ladder: sysfs capacity -> sysfs uevent (POWER_SUPPLY_CAPACITY=NN) -> unavailable
         cap = run("cat /sys/class/power_supply/battery/capacity")
-        out["battery"] = ({"percent": int(cap), "source": "sysfs"}
-                          if cap and cap.isdigit() else {"source": "unavailable"})
+        if cap and cap.isdigit():
+            out["battery"] = {"percent": int(cap), "source": "sysfs"}
+        else:
+            ue = run("cat /sys/class/power_supply/battery/uevent") or ""
+            for kv in ue.splitlines():
+                if kv.startswith("POWER_SUPPLY_CAPACITY="):
+                    out["battery"] = {"percent": int(kv.split("=", 1)[1]),
+                                      "source": "sysfs-uevent"}
+                    break
+            else:
+                out["battery"] = {"source": "unavailable"}
 
     # storage: df /data
     df = run("df -h /data")
@@ -86,8 +104,9 @@ def handle(req):
     rid = req.get("id")
 
     if method == "initialize":
+        client_ver = req.get("params", {}).get("protocolVersion")
         return {"jsonrpc": "2.0", "id": rid, "result": {
-            "protocolVersion": PROTOCOL_VERSION,
+            "protocolVersion": negotiate_version(client_ver),
             "capabilities": {"tools": {}},
             "serverInfo": {"name": "nano-mcp-system", "version": "0.1.0"},
         }}
@@ -116,7 +135,7 @@ def handle(req):
 
 
 def main():
-    log("nano-mcp-system starting (protocol " + PROTOCOL_VERSION + ")")
+    log("nano-mcp-system starting (supported: " + ", ".join(SUPPORTED_VERSIONS) + ")")
     for line in sys.stdin:
         line = line.strip()
         if not line:

@@ -37,7 +37,8 @@ python3 nano/test_client.py   # -> ALL CHECKS PASSED
 
 Protocol surface (minimal promise, maximum compatibility):
 
-- `initialize` → `protocolVersion: 2025-06-18`, `capabilities: {"tools": {}}` (nothing more, so no client can break on unsupported capability negotiation)
+- `initialize` → `protocolVersion` echoes the client's requested version if supported (`2025-06-18`, `2025-11-25`), otherwise falls back to the highest supported version per the MCP version-negotiation strategy; `capabilities: {"tools": {}}` (nothing more, so no client can break on unsupported capability negotiation)
+- Battery reads degrade gracefully: `termux-api` → sysfs `capacity` → sysfs `uevent` (`POWER_SUPPLY_CAPACITY`) → `unavailable`
 - `notifications/initialized` → silent (no response, per JSON-RPC spec)
 - `ping` → `{}`
 - `tools/list` → tool cards with `name` / `description` / `inputSchema`
