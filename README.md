@@ -72,6 +72,19 @@ Never let a tool call fail because a subsystem is missing (no termux-api, no roo
 
 PRs welcome, but a listing without proof will be rejected. Provide: device model, Android version, Termux version, client used (Claude Desktop / Cursor / Operit / ...), and reproduction steps.
 
+**Mandatory for any new tool that spawns processes:** client `arguments` MUST be passed as argument arrays or escaped with `shlex.quote()` — never interpolated into a command string. PRs violating this will be rejected.
+
+Listings must not require disabling security mechanisms, or permissions beyond what their stated features need.
+
+## Security
+
+- **Least privilege by design** — runs as the Termux sandbox user, no root, no ADB. Worst case = the Termux app's own permissions.
+- **No arbitrary command execution** — tools are a static whitelist (`device_status` only). Client `arguments` never reach a shell.
+- **Zero dependencies** — ~165 lines of stdlib-only Python, fully auditable before you run it.
+- **Read-only** — collects device metadata (battery/storage/arch/memory). No location, no contacts, no network egress, no writes.
+- **stdio is the trust boundary** — communicates over stdin/stdout pipes only; no TCP port is ever opened.
+- Disabling Phantom Process Killer (`settings` / `device_config`) is a **manual user action** with ADB/Shizuku. The MCP server itself never executes it.
+
 ## Related
 
 - [AI-Android-Playbook](https://github.com/Lmeng486/AI-Android-Playbook) — companion repo: agent pitfall protocols & a runtime interceptor harness for Android.
