@@ -19,7 +19,7 @@ Most MCP (Model Context Protocol) servers assume a PC with Docker and Node. Almo
 | [htekdev/phone-mcp-server](https://github.com/htekdev/phone-mcp-server) | 19 | ⚠️→✅* | Verified on device — Streamable HTTP; 19 tools live, battery/flashlight/volume/device_info/shell tested; see report below |
 | [xlisp/termux-mcp-server](https://github.com/xlisp/termux-mcp-server) | 52 | ⚠️→✅* | Verified on device — stdio; 52 tools live, 7 read-only tools tested end-to-end; see report below |
 | [wujie272/termux-mcp](https://github.com/wujie272/termux-mcp) | 72 | ⚠️→✅* | Verified on device — stdio; 72 tools + 8 resources live, 10 read-only calls tested end-to-end; see report below |
-| MemPlato | 29 | ⚠️ | Runs inside Termux |
+| [VChe-creator/memplato](https://github.com/VChe-creator/memplato) | 29 | ⚠️→✅* | Verified on device — FastAPI/SSE; server starts, 29 tools live, 6 read-only tools tested in-process (HTTP loopback blocked by device); see report below |
 | Mobile MCP / Android Mobile MCP | varies | 🚫 | Designed for ADB from a host machine |
 | ADB Friend | varies | 🚫 | ADB host-dependent |
 
@@ -109,6 +109,15 @@ Same device (Xiaomi 23013RK75C, Android 15, no root, Termux 0.118.3, Python 3.14
 - **Found a real bug**: resource `device://info` crashes with `IndexError: list index out of range` in `resources.py:38` (uptime parsing has no fallback for empty output). Reported as upstream issue material.
 - **Verdict**: ✅ works as advertised on the Direct-Termux tier, no root needed. Shizuku/ADB-tier tools degrade gracefully with clear messages. Watch: README tool count (120+) overstates the default-load set (72).
 - **Repro**: `curl -sL https://codeload.github.com/wujie272/termux-mcp/tar.gz/refs/heads/master | tar xz && python server.py` on Termux Python 3.14 (with FastMCP shim due to rpds-py).
+
+### Third-party verification: VChe-creator/memplato (29 tools)
+- **Architecture**: Flutter Android app + Python FastAPI MCP server (`assets/memplato_server.py`, 1517 lines) exposing 29 `memplato_*` tools over SSE (`/sse`) + a hand-written JSON-RPC `/mcp` endpoint (port 7333, SQLite at `~/.memplato_mobile/palace.db`). Repo `github.com/MemPlato` from the README is a 404 — real repo found via GitHub API: `VChe-creator/memplato`, AGPL-3.0, v1.0.8 MVP.
+- **Reality on Termux/Py3.14**: `pip install mcp` / `pydantic>=2` / `numpy` all fail to compile (rpds-py / pydantic-core / cmake backend) — pinned `pydantic<2` + `fastapi==0.95.2` works, `numpy` patched to a try/except import (server degrades to fulltext search, embeddings disabled), and a minimal `mcp` stub package supplies `Server`/`Tool`/`TextContent`/`SseServerTransport` (the script only uses the decorator registry, never the request loop).
+- **Server startup**: ✅ `PYTHONPATH=<stub dir> python assets/memplato_server.py` → uvicorn on `0.0.0.0:7333`, `[OK] memplato Mobile v1.0.8 running on port 7333`, embeddings gracefully disabled (no ONNX model).
+- **HTTP loopback is device-blocked**: `curl` and raw `socket.connect()` to `127.0.0.1:7333` and `::1:7333` all time out — a decisive control test (listen on 7455 then connect to self, same process, no server involved) **also times out**, proving the block is Android-15/MIUI-level loopback interception, not a project bug.
+- **In-process MCP test (bypasses HTTP, semantically identical — the `/mcp` endpoint just calls these functions)**: `list_mcp_tools()` → **29 tools**, matching the README claim exactly. 6 read-only tools called end-to-end: `memplato_status` (`{"status":"ok","server":"memplato Mobile v1.0.8","drawers":0,"embeddings":false,"port":7333}`), `memplato_list_wings`, `memplato_get_taxonomy`, `memplato_kg_stats`, `memplato_graph_stats`, `memplato_search(query="test")` — all return valid JSON.
+- **Verdict**: ✅ server core works on device with moderate dependency shims; the SSH-relay / autossh tunnel path (relay.memplato.com) was not tested (requires external network + app authorization, out of scope). Watch: HTTP transport unusable on MIUI-loopback-restricted devices — stdio/in-process or a TCP-capable environment is needed.
+- **Repro**: `curl -sL https://codeload.github.com/VChe-creator/memplato/tar.gz/refs/heads/main | tar xz && cd memplato-main && PYTHONPATH=<stub> python assets/memplato_server.py` on Termux Python 3.14.
 
 ### 1. stdout is sacred
 Any `print()` inside an MCP server is a bug: one stray line and the client dies with a JSON-RPC Parse Error and hangs. Write all logs to `sys.stderr`, always `flush()`, and wrap the whole loop in a global `try/except` so tracebacks never leak to stdout. (nano-mcp-system.py already does this — copy the pattern.)
