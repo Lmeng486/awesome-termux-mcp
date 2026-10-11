@@ -18,7 +18,7 @@ Most MCP (Model Context Protocol) servers assume a PC with Docker and Node. Almo
 | [Termux-API-Tools-MCP-Server](https://github.com/hyhAsma/termux-api-tools-mcp-server) | 38 | ⚠️→✅* | Verified on device — protocol + full tool surface live; see report below |
 | [htekdev/phone-mcp-server](https://github.com/htekdev/phone-mcp-server) | 19 | ⚠️→✅* | Verified on device — Streamable HTTP; 19 tools live, battery/flashlight/volume/device_info/shell tested; see report below |
 | [xlisp/termux-mcp-server](https://github.com/xlisp/termux-mcp-server) | 52 | ⚠️→✅* | Verified on device — stdio; 52 tools live, 7 read-only tools tested end-to-end; see report below |
-| wujie272/termux-mcp | 100+ | ⚠️ | Largest tool count, unverified on-device |
+| [wujie272/termux-mcp](https://github.com/wujie272/termux-mcp) | 72 | ⚠️→✅* | Verified on device — stdio; 72 tools + 8 resources live, 10 read-only calls tested end-to-end; see report below |
 | MemPlato | 29 | ⚠️ | Runs inside Termux |
 | Mobile MCP / Android Mobile MCP | varies | 🚫 | Designed for ADB from a host machine |
 | ADB Friend | varies | 🚫 | ADB host-dependent |
@@ -99,6 +99,16 @@ Same device (Xiaomi 23013RK75C, Android 15, no root, Termux 0.118.3, Python 3.14
 - **End-to-end `tools/call` (7 read-only tools, zero write calls)**: `get_battery_status` → 54% / Li-poly / 38.7°C / cycle 828; `get_device_info` → Redmi 23013RK75C, Android 15 SDK 35, aarch64; `get_volume` → 6 streams (call 9/11, alarm 15/15); `get_sensor_list` → 70+ hardware sensors; `list_directory` → real Termux home listing; `get_storage_info` → 462G/97G avail/80%; `adb_setup_status` → graceful degradation hint ("pkg install android-tools") — expected without adb, not a project defect.
 - **Verdict**: ✅ works as advertised. termux-api/Python-internal tools are usable out-of-the-box without root; adb-family tools require `pkg install android-tools` + wireless debugging pairing (normal Android 12+ gate, not a bug).
 - **Repro**: clone repo → `python termux_mcp_server.py` under any MCP stdio client (or mcp[cli] on Py<3.14) → initialize → tools/list → tools/call.
+
+### Third-party verification: wujie272/termux-mcp (72 tools)
+
+- **Architecture**: Full refactor of xlisp/termux-mcp-server into a multi-module package (`termux_mcp/`), v0.4.0, MIT. FastMCP + stdio (`server.py`) / HTTP (`http_server.py`, port 3000) dual entry. Layered tool loading, 8 MCP Resources, security gates (`TERMUX_MCP_READONLY`, `TERMUX_MCP_ALLOW_SHELL`), three-tier privilege chain (Shizuku rish → ADB → Direct Termux).
+- **Reality on Termux/Py3.14**: `pip install mcp` fails (rpds-py has no arm64 Py3.14 wheel) — verified via a local FastMCP shim. Shim needed 3 additions for this project: a `Context` class (tools use `await ctx.report_progress`), auto-injection of `ctx` into tool calls, and `@mcp.resource()` support + `resources/list`/`resources/read` methods.
+- **Handshake**: `initialize` → `termux-control`, protocol 2024-11-05. **tools/list → 72 tools** (README claims "120+" across all modules incl. a disabled GitHub module — the shipped default set is 72). **resources/list → 8 resources** as advertised.
+- **End-to-end read-only tests**: `get_battery_status` (real: 38%, Li-poly, 41.8°C, cycle 828, DISCHARGING); `get_device_info` (Model 23013RK75C, Android 15, aarch64, uptime 7:46); `get_wifi_info` (returns data; ssid masked by Android 15 permission limits); `get_storage_info` (462G/365G/97G, 80%); `get_volume` (6 streams); `list_installed_packages` (dpkg output); `read_file` (real file content); `search_files` (works, injected ctx required); `shizuku_status` (graceful degradation: "未启动 — 请在 Shizuku App 中启动"); `device_health` (health score 100/100, though battery/storage sub-checks failed to parse); `resources/read device://battery` (real JSON battery data).
+- **Found a real bug**: resource `device://info` crashes with `IndexError: list index out of range` in `resources.py:38` (uptime parsing has no fallback for empty output). Reported as upstream issue material.
+- **Verdict**: ✅ works as advertised on the Direct-Termux tier, no root needed. Shizuku/ADB-tier tools degrade gracefully with clear messages. Watch: README tool count (120+) overstates the default-load set (72).
+- **Repro**: `curl -sL https://codeload.github.com/wujie272/termux-mcp/tar.gz/refs/heads/master | tar xz && python server.py` on Termux Python 3.14 (with FastMCP shim due to rpds-py).
 
 ### 1. stdout is sacred
 Any `print()` inside an MCP server is a bug: one stray line and the client dies with a JSON-RPC Parse Error and hangs. Write all logs to `sys.stderr`, always `flush()`, and wrap the whole loop in a global `try/except` so tracebacks never leak to stdout. (nano-mcp-system.py already does this — copy the pattern.)
