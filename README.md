@@ -16,7 +16,7 @@ Most MCP (Model Context Protocol) servers assume a PC with Docker and Node. Almo
 |---|---|---|---|
 | [nano-mcp-system (this repo)](./nano) | 1+ | ✅ | Verified on device — 13/13 checks, battery via termux-api |
 | [Termux-API-Tools-MCP-Server](https://github.com/hyhAsma/termux-api-tools-mcp-server) | 38 | ⚠️→✅* | Verified on device — protocol + full tool surface live; see report below |
-| htekdev/phone-mcp-server | 18 | ⚠️ | Same-source install requirement |
+| [htekdev/phone-mcp-server](https://github.com/htekdev/phone-mcp-server) | 19 | ⚠️→✅* | Verified on device — Streamable HTTP; 19 tools live, battery/flashlight/volume/device_info/shell tested; see report below |
 | xlisp/termux-mcp-server | 45+ | ⚠️ | Broad Termux API surface |
 | wujie272/termux-mcp | 100+ | ⚠️ | Largest tool count, unverified on-device |
 | MemPlato | 29 | ⚠️ | Runs inside Termux |
@@ -76,7 +76,19 @@ Same device & Termux environment. Findings (tested read-only tools only; no `sen
 - **Verdict:** protocol and full tool surface are real and functional on-device once (a) an SSH transport shim replaces unbuilt Rust deps and (b) sshd runs on the phone itself. The SSH-in-the-middle design is redundant when the client already runs inside Termux — direct `subprocess` calls would drop the paramiko layer entirely.
 - Repro: `pip install paramiko` (apt: `python-cryptography python-bcrypt python-pynacl openssh`); place a `fastmcp.py` shim on `sys.path` (fastmcp itself cannot build); `ssh-keygen` + `sshd`; load module, drive `mcp` via stdio JSON-RPC.
 
-
+### Third-party verification: `htekdev/phone-mcp-server` (19 tools)
+Same device. Findings (read-only tools only; `send_sms`/`make_call`/`set_clipboard`/`record_audio`/`take_photo` were never invoked):
+- **Architecture:** the only Streamable-HTTP entry in this directory — Node.js + Express + `@modelcontextprotocol/sdk`, listens on `:3000` (`/mcp` POST/GET/DELETE + `/health`), sessions via `mcp-session-id`. Zero root required; every tool shells out to `termux-*` from Termux:API.
+- **Termux reality:** apt `nodejs` (v26.4.0) initially failed with `cannot locate symbol "OSSL_PROVIDER_add_conf_parameter"` — fixed by `apt-get install --only-upgrade openssl`. Long-background Termux also got network-cut by MIUI per-UID policy (`dumpsys netpolicy` shows `APP_STANDBY|APP_BACKGROUND`); `am set-standby-bucket com.termux active` + foregrounding the app restored it. Neither is a project defect.
+- **Protocol handshake (raw curl):** `initialize` → `protocolVersion 2025-03-26`, serverInfo `phone-mcp 1.0.0`; `tools/list` → **19 tools live** (18 Termux:API + 1 `shell` bonus with a `BLOCKED_COMMANDS` denylist: `rm -rf /`, `mkfs`, `dd if=`, `reboot`, `shutdown`, `> /dev/`, `chmod 777 /`).
+- **End-to-end `tools/call`** (all via real HTTP round-trips):
+  - `get_battery`: `{"percentage": 58, "technology": "Li-poly", "temperature": 38.5, "cycle": 828, ...}`
+  - `get_volume`: 6 audio streams with real values (call 9/11, alarm 15/15, ...)
+  - `device_info`: platform android/arm64, uptime, memory, battery + WiFi (`ip 192.168.2.105`, `link_speed 432 Mbps`) panorama
+  - `flashlight`: `state:"on"` → "Flashlight turned on" → `state:"off"` → closed loop ✅
+  - `shell`: `echo hello-from-mcp` → `hello-from-mcp` (safe echo-level check only)
+- **Verdict:** design is sound for Termux — no root, no SSH detour, plain `execFile("termux-*")`. Streamable HTTP makes it reachable from other devices on the LAN too (a plus the stdio projects lack). Only friction is Termux-side environment upkeep (openssl version, MIUI background network cuts).
+- Repro: inside Termux `pkg install nodejs-lts termux-api`; `npm install`; `node server.js`; POST `initialize` with `Accept: application/json, text/event-stream`, keep the returned `mcp-session-id`, then `tools/list` / `tools/call`.
 ## Runtime Survival Guide (read before you connect anything)
 
 ### 1. stdout is sacred
