@@ -17,7 +17,7 @@ Most MCP (Model Context Protocol) servers assume a PC with Docker and Node. Almo
 | [nano-mcp-system (this repo)](./nano) | 1+ | ✅ | Verified on device — 13/13 checks, battery via termux-api |
 | [Termux-API-Tools-MCP-Server](https://github.com/hyhAsma/termux-api-tools-mcp-server) | 38 | ⚠️→✅* | Verified on device — protocol + full tool surface live; see report below |
 | [htekdev/phone-mcp-server](https://github.com/htekdev/phone-mcp-server) | 19 | ⚠️→✅* | Verified on device — Streamable HTTP; 19 tools live, battery/flashlight/volume/device_info/shell tested; see report below |
-| xlisp/termux-mcp-server | 45+ | ⚠️ | Broad Termux API surface |
+| [xlisp/termux-mcp-server](https://github.com/xlisp/termux-mcp-server) | 52 | ⚠️→✅* | Verified on device — stdio; 52 tools live, 7 read-only tools tested end-to-end; see report below |
 | wujie272/termux-mcp | 100+ | ⚠️ | Largest tool count, unverified on-device |
 | MemPlato | 29 | ⚠️ | Runs inside Termux |
 | Mobile MCP / Android Mobile MCP | varies | 🚫 | Designed for ADB from a host machine |
@@ -90,6 +90,15 @@ Same device. Findings (read-only tools only; `send_sms`/`make_call`/`set_clipboa
 - **Verdict:** design is sound for Termux — no root, no SSH detour, plain `execFile("termux-*")`. Streamable HTTP makes it reachable from other devices on the LAN too (a plus the stdio projects lack). Only friction is Termux-side environment upkeep (openssl version, MIUI background network cuts).
 - Repro: inside Termux `pkg install nodejs-lts termux-api`; `npm install`; `node server.js`; POST `initialize` with `Accept: application/json, text/event-stream`, keep the returned `mcp-session-id`, then `tools/list` / `tools/call`.
 ## Runtime Survival Guide (read before you connect anything)
+
+### Third-party verification: `xlisp/termux-mcp-server` (52 tools)
+Same device (Xiaomi 23013RK75C, Android 15, no root, Termux 0.118.3, Python 3.14.6).
+- **Architecture**: single-file Python stdio MCP server, `mcp[cli]>=1.2.0` (FastMCP), 52 tools in two families: termux-api direct calls and adb-routed commands (Android 12+ auto-routes `_ADB_REQUIRED_CMDS` through `adb shell`). Ships a `BLOCKED_COMMANDS` blacklist (rm/mkfs/dd/shutdown/...).
+- **Reality on Termux/Py3.14**: `pip install mcp` fails — `rpds-py` has no arm64 Py3.14 wheel and source build dies. Verified against the official protocol with a local FastMCP-compatible shim.
+- **Handshake**: `initialize` → `termux-control 0.1.0`, protocol 2024-11-05; `tools/list` → **52 tools** (README claims 45+, actual is higher).
+- **End-to-end `tools/call` (7 read-only tools, zero write calls)**: `get_battery_status` → 54% / Li-poly / 38.7°C / cycle 828; `get_device_info` → Redmi 23013RK75C, Android 15 SDK 35, aarch64; `get_volume` → 6 streams (call 9/11, alarm 15/15); `get_sensor_list` → 70+ hardware sensors; `list_directory` → real Termux home listing; `get_storage_info` → 462G/97G avail/80%; `adb_setup_status` → graceful degradation hint ("pkg install android-tools") — expected without adb, not a project defect.
+- **Verdict**: ✅ works as advertised. termux-api/Python-internal tools are usable out-of-the-box without root; adb-family tools require `pkg install android-tools` + wireless debugging pairing (normal Android 12+ gate, not a bug).
+- **Repro**: clone repo → `python termux_mcp_server.py` under any MCP stdio client (or mcp[cli] on Py<3.14) → initialize → tools/list → tools/call.
 
 ### 1. stdout is sacred
 Any `print()` inside an MCP server is a bug: one stray line and the client dies with a JSON-RPC Parse Error and hangs. Write all logs to `sys.stderr`, always `flush()`, and wrap the whole loop in a global `try/except` so tracebacks never leak to stdout. (nano-mcp-system.py already does this — copy the pattern.)
