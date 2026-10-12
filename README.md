@@ -15,6 +15,7 @@ Most MCP (Model Context Protocol) servers assume a PC with Docker and Node. Almo
 | Project | Tools | Badge | Notes |
 |---|---|---|---|
 | [nano-mcp-system (this repo)](./nano) | 1+ | ✅ | Verified on device — 13/13 checks, battery via termux-api |
+| [nano-mcp-termux](https://github.com/Lmeng486/nano-mcp-termux) | 4 | ✅ | Verified on device — 32/32 protocol checks + orphan-leak A/B regression; process-group lifecycle & Android path adapter |
 | [Termux-API-Tools-MCP-Server](https://github.com/hyhAsma/termux-api-tools-mcp-server) | 38 | ⚠️→✅* | Verified on device — protocol + full tool surface live; see report below |
 | [htekdev/phone-mcp-server](https://github.com/htekdev/phone-mcp-server) | 19 | ⚠️→✅* | Verified on device — Streamable HTTP; 19 tools live, battery/flashlight/volume/device_info/shell tested; see report below |
 | [xlisp/termux-mcp-server](https://github.com/xlisp/termux-mcp-server) | 52 | ⚠️→✅* | Verified on device — stdio; 52 tools live, 7 read-only tools tested end-to-end; see report below |
@@ -59,6 +60,18 @@ First tool: **`device_status`** — aggregates battery / storage / arch / memory
    "memory": {"source": "free", "raw": "Mem: 15152 total / 3559 avail"}}
   ```
 - Proot (simulated) vs device contrast: in proot the battery rung falls through to `unavailable`; on real Termux the full ladder up to `termux-api` works — exactly the graceful degradation the design promises.
+
+### Sibling project: `nano-mcp-termux` (4 tools, 1.1.0)
+
+Same device & Termux environment. Where `nano-mcp-system` stops at "one tool, minimal promise", `nano-mcp-termux` pushes the same zero-dependency, single-file idea into the two places MCP servers on phones actually break:
+
+- **`[lifecycle]` no orphaned processes** — 1.0.0 used `subprocess.run(..., timeout=...)`, which kills only the direct `sh -c` child; grandchildren get reparented to init and survive forever (the exact leak class that trips Phantom Process Killer). 1.1.0 spawns with `start_new_session=True` and tears down with `os.killpg(pgid, SIGTERM)` → `SIGKILL`.
+  Reproducible A/B proof shipped in-repo: `python3 test_lifecycle_orphan.py` → `current leaked_grandchildren=0` / `legacy leaked_grandchildren=1`.
+- **`[lifecycle]` self-terminating server** — parent watchdog + stdin-EOF detection + optional idle timeout, so a dead client never leaves a zombie server.
+- **`[paths]` Android/Termux path adapter** — resolves `/sdcard` ↔ `/storage/emulated/0` ↔ `$HOME/storage/shared`, flags `noexec` mounts, case-insensitive filesystems and shell-quoting hazards before a tool call ever reaches a shell.
+- **`server_health`** — pid/ppid/env, uptime, request counters, live children, reaping policy, RSS, and a Phantom Process Killer risk assessment.
+
+Protocol suite: **32/32 PASS** (`python3 test_client.py`), including version negotiation across `2024-11-05` / `2025-06-18` / `2025-11-25`, error codes `-32602` / `-32700`, stdout-JSON-only hygiene and stdin-close self-termination.
 
 ### Third-party verification: `hyhAsma/termux-api-tools-mcp-server` (38 tools)
 
