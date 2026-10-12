@@ -2,6 +2,8 @@
 
 > **A Curated Directory of Verified MCP Servers on Android (Termux / PRoot) — with a Zero-Dependency Nano Prototype & Runtime Survival Guides.**
 
+[![CI](https://github.com/Lmeng486/awesome-termux-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/Lmeng486/awesome-termux-mcp/actions/workflows/ci.yml)
+
 Most MCP (Model Context Protocol) servers assume a PC with Docker and Node. Almost nothing is **curated, tested and documented for running directly on an Android phone inside Termux/PRoot**. This repo fills that gap:
 
 1. **Verified directory** — every listed server carries a real-device badge (see below).
