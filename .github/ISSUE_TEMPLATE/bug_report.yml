@@ -1,0 +1,38 @@
+name: Report an issue
+description: Something in the directory or a verification report is wrong
+title: "[issue] "
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What is wrong?
+      options:
+        - A listing is inaccurate (tool count, badge or link)
+        - A verification report is wrong
+        - Bug in nano/nano-mcp-system.py
+        - Broken link or formatting
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      placeholder: Xiaomi 23013RK75C / Android 15 / Termux 0.118.3 / Python 3.14.6
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or command output
+      render: shell

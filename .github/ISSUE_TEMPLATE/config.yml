@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://github.com/Lmeng486/awesome-termux-mcp/security/advisories/new
+    about: Report vulnerabilities privately, never in a public issue.
+  - name: Runtime Survival Guide
+    url: https://github.com/Lmeng486/awesome-termux-mcp#runtime-survival-guide-read-before-you-connect-anything
+    about: Read this before reporting "the server dies on my phone".
+  - name: Sibling project
+    url: https://github.com/Lmeng486/nano-mcp-termux
+    about: The 4-tool, 1.1.0 nano server with process-group lifecycle hardening.

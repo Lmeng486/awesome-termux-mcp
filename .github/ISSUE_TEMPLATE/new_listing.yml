@@ -1,0 +1,73 @@
+name: New listing
+description: Propose a verified Termux/Android MCP server for the directory
+title: "[listing] <owner/repo>"
+labels: ["listing"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A listing without on-device proof is rejected. Fill in every field.
+        Badges start at the unverified tier and are only upgraded to a checkmark
+        after an end-to-end run on real hardware.
+  - type: input
+    id: repo
+    attributes:
+      label: Repository URL
+      placeholder: https://github.com/owner/repo
+    validations:
+      required: true
+  - type: input
+    id: tools
+    attributes:
+      label: Number of tools it actually exposes
+      placeholder: "19"
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device model
+      placeholder: Xiaomi 23013RK75C
+    validations:
+      required: true
+  - type: input
+    id: android
+    attributes:
+      label: Android / Termux version
+      placeholder: Android 15 (SDK 35) / Termux 0.118.3
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: MCP client used
+      placeholder: Claude Desktop / Cursor / Operit
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction steps
+      description: Exact commands from a clean shell to a successful tools/list.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Paste real output from at least one read-only tools/call.
+      render: json
+    validations:
+      required: true
+  - type: checkboxes
+    id: rules
+    attributes:
+      label: Ground rules
+      options:
+        - label: It runs without disabling any security mechanism.
+          required: true
+        - label: It asks for no permissions beyond its stated features.
+          required: true
+        - label: Any process-spawning tool passes arguments as arrays or via shlex.quote().
+          required: true
