@@ -104,6 +104,11 @@ Same device. Findings (read-only tools only; `send_sms`/`make_call`/`set_clipboa
   - `shell`: `echo hello-from-mcp` → `hello-from-mcp` (safe echo-level check only)
 - **Verdict:** design is sound for Termux — no root, no SSH detour, plain `execFile("termux-*")`. Streamable HTTP makes it reachable from other devices on the LAN too (a plus the stdio projects lack). Only friction is Termux-side environment upkeep (openssl version, MIUI background network cuts).
 - Repro: inside Termux `pkg install nodejs-lts termux-api`; `npm install`; `node server.js`; POST `initialize` with `Accept: application/json, text/event-stream`, keep the returned `mcp-session-id`, then `tools/list` / `tools/call`.
+## Measured Reports
+
+- **[MCP on Mobile: Measured Overhead Report](./docs/MCP-ON-MOBILE-OVERHEAD.md)** — handshake cost, tool-catalog token cost, JSON-RPC vs protobuf wire size, and schema-scaling figures, all measured on the device below. Reproducible with `scripts/measure_overhead.py` + `scripts/probe_bench.py`.
+- **[Edge MCP Failure Taxonomy](./docs/EDGE-MCP-FAILURE-TAXONOMY.md)** — every way an MCP server actually breaks on Android, classified by root cause, each backed by a real-device case from this directory.
+
 ## Runtime Survival Guide (read before you connect anything)
 
 ### Third-party verification: `xlisp/termux-mcp-server` (52 tools)
