@@ -14,7 +14,13 @@ B. Long-lived session latency: one server process, N sequential requests,
 
 C. Schema scaling: measured per-tool schema cost extrapolated to the tool
    counts of real Termux MCP servers (19/29/38/52/72). Extrapolation is
-   labelled as such -- only the 4-tool figure is measured.
+   labelled as such -- only the 4-tool figure is measured. The token column
+   here is the chars/4 heuristic; the report section 2.5 figures come from
+   scripts/token_probe.py (real BPE) and are lower.
+
+Byte conventions: the JSON-RPC sizes below are *compact* re-serialisations
+("," / ":" separators), not the bytes the server writes to stdio (default
+", " / ": " separators, which are larger). See report section 1.
 
 Usage:
     python3 probe_bench.py
@@ -28,7 +34,34 @@ import sys
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SERVER = os.environ.get("MCP_SERVER", os.path.join(HERE, "nano_mcp_termux.py"))
+
+
+def resolve_server():
+    """Locate the server under test.
+
+    Order: first positional CLI argument -> $MCP_SERVER -> ./nano_mcp_termux.py
+    -> /tmp/nano-mcp-termux/nano_mcp_termux.py. This repo does not vendor the
+    server (it lives in Lmeng486/nano-mcp-termux), so a bare invocation needs
+    either a clone at /tmp/nano-mcp-termux or an explicit path.
+    """
+    for a in sys.argv[1:]:
+        if not a.startswith("-"):
+            return a
+    cands = [os.environ.get("MCP_SERVER"),
+             os.path.join(HERE, "nano_mcp_termux.py"),
+             "/tmp/nano-mcp-termux/nano_mcp_termux.py"]
+    for cand in cands:
+        if cand and os.path.isfile(cand):
+            return cand
+    # nothing found -- return the first non-empty candidate so the caller can
+    # report the most likely intended path
+    for cand in cands:
+        if cand:
+            return cand
+    return ""
+
+
+SERVER = resolve_server()
 PY = sys.executable
 
 
@@ -83,6 +116,13 @@ def find(raw, want_id):
 
 
 def tok(text):
+    """chars/4 heuristic -- NOT a tokenizer count.
+
+    Kept only for the schema-scaling column below. The figures quoted in
+    the report section 2.5 come from scripts/token_probe.py (real BPE;
+    Qwen2.5 lower bound, GPT-2 upper bound) and run ~15-25%% below this
+    estimate.
+    """
     return max(1, round(len(text) / 4))
 
 
@@ -115,6 +155,16 @@ class Session:
 
 def main():
     as_json = "--json" in sys.argv
+    if not os.path.isfile(SERVER):
+        sys.stderr.write(
+            "error: server under test not found: %r\n"
+            "This repo does not bundle the server. Either clone it:\n"
+            "  git clone https://github.com/Lmeng486/nano-mcp-termux /tmp/nano-mcp-termux\n"
+            "or point at it explicitly:\n"
+            "  MCP_SERVER=/path/to/nano_mcp_termux.py python3 %s\n"
+            % (SERVER, os.path.basename(__file__)))
+        return 2
+
     out = {}
 
     # ---------------- A. wire size ----------------
@@ -210,12 +260,13 @@ def main():
     print()
     sc = out["scaling"]
     print("== C. tools/list schema cost ==")
+    print("   (token column = chars/4 heuristic, not the report section 2.5 figures)")
     print("measured: %d tools -> %d bytes (%.1f bytes/tool)"
           % (sc["measured_tools"], sc["measured_total_bytes"], sc["per_tool_bytes"]))
     print("extrapolated to real Termux servers:")
     for row in sc["extrapolated"]:
         mark = " (measured)" if row["measured"] else " (extrapolated)"
-        print("   %3d tools -> %5d bytes  ~%5d tokens%s"
+        print("   %3d tools -> %5d bytes  ~%5d tok(chars/4)%s"
               % (row["tool_count"], row["est_bytes"], row["est_tokens"], mark))
     return 0
 

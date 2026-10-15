@@ -13,7 +13,14 @@ What it measures
 2. tools/list  -> total response bytes, plus per-tool schema bytes
 3. tools/call  -> a real device_status round-trip (payload + wall time)
 4. token estimate for the tools/list payload (chars/4 heuristic, labelled as
-   an estimate, not a tokenizer count)
+   an estimate, not a tokenizer count). For real-tokenizer counts use
+   scripts/token_probe.py.
+
+Byte conventions
+----------------
+`tools_list_bytes` is a *compact* re-serialisation ("," / ":" separators), not
+the bytes the server actually writes to stdio (default ", " / ": " separators,
+which are larger). See the byte-convention table in the report's section 1.
 
 Usage
 -----
@@ -27,7 +34,34 @@ import sys
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SERVER = os.environ.get("MCP_SERVER", os.path.join(HERE, "nano_mcp_termux.py"))
+
+
+def resolve_server():
+    """Locate the server under test.
+
+    Order: first positional CLI argument -> $MCP_SERVER -> ./nano_mcp_termux.py
+    -> /tmp/nano-mcp-termux/nano_mcp_termux.py. This repo does not vendor the
+    server (it lives in Lmeng486/nano-mcp-termux), so a bare invocation needs
+    either a clone at /tmp/nano-mcp-termux or an explicit path.
+    """
+    for a in sys.argv[1:]:
+        if not a.startswith("-"):
+            return a
+    cands = [os.environ.get("MCP_SERVER"),
+             os.path.join(HERE, "nano_mcp_termux.py"),
+             "/tmp/nano-mcp-termux/nano_mcp_termux.py"]
+    for cand in cands:
+        if cand and os.path.isfile(cand):
+            return cand
+    # nothing found -- return the first non-empty candidate so the caller can
+    # report the most likely intended path
+    for cand in cands:
+        if cand:
+            return cand
+    return ""
+
+
+SERVER = resolve_server()
 
 
 def rpc(lines, timeout=20):
@@ -66,6 +100,16 @@ def token_estimate(text):
 
 def main():
     as_json = "--json" in sys.argv
+
+    if not os.path.isfile(SERVER):
+        sys.stderr.write(
+            "error: server under test not found: %r\n"
+            "This repo does not bundle the server. Either clone it:\n"
+            "  git clone https://github.com/Lmeng486/nano-mcp-termux /tmp/nano-mcp-termux\n"
+            "or point at it explicitly:\n"
+            "  MCP_SERVER=/path/to/nano_mcp_termux.py python3 %s\n"
+            % (SERVER, os.path.basename(__file__)))
+        return 2
 
     init_req = {
         "jsonrpc": "2.0", "id": 1, "method": "initialize",

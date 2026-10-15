@@ -177,6 +177,17 @@ measures the real bytes:
 | **Request** | 95 B | 29 B | **3.3×** |
 | **Response** | 437 B | 331 B | **1.3×** |
 
+> **Byte-count conventions** (same three-way split as §1). Both JSON-RPC figures in
+> this table are *compact* re-serialisations (`separators=(",", ":")`) — the same
+> convention as §2.3. The bytes the server actually writes to stdio for the same
+> `device_status` call are **96 B** (request) and **425 B** (response, including the
+> trailing newline; 424 B without it, the value quoted in §2.3). On the protobuf side
+> the request is a bare `ToolCall` message and the response is the **content payload
+> alone, with no protobuf envelope; wrapping it would only make the protobuf larger
+> and the ratio smaller, so **1.3× is the conservative figure**. Absolute values also
+> drift with the interpreter: the numbers above come from the real device
+> (CPython 3.14.6), while PRoot (CPython 3.12.3) reproduces **415 B / 311 B**.
+
 **Verdict: refuted.** The real overhead of JSON-RPC over a binary encoding for
 this workload is **3.3× on the request and 1.3× on the response** — not 10–25×.
 The "2–5 KB" figure is off by roughly **5–25×** for a realistic mobile tool
@@ -184,8 +195,8 @@ call.
 
 Why the gap? The quoted figure tends to count the *entire* JSON-RPC envelope,
 pretty-printed, with full schema echoes — or simply assumes a large payload that
-this class of server does not produce. On the wire, with compact separators, a
-tool call is a few hundred bytes.
+this class of server does not produce. As actually written to stdio, a tool call
+here is under half a kilobyte in both directions (96 B request, 425 B response).
 
 **Practical consequence:** switching a mobile MCP server to protobuf would save
 ~66 bytes per request and ~106 bytes per response here. That is not where the
@@ -279,10 +290,18 @@ directed at subprocess spawn cost (§2.3) and model inference, not at the pipe.
 ```bash
 git clone https://github.com/Lmeng486/awesome-termux-mcp
 cd awesome-termux-mcp
+git clone https://github.com/Lmeng486/nano-mcp-termux /tmp/nano-mcp-termux
 python3 scripts/measure_overhead.py
 python3 scripts/probe_bench.py
 python3 scripts/token_probe.py   # offline real-tokenizer re-count
 ```
+
+This repository does not vendor the server under test. All three scripts look
+for it in the same order -- first positional argument, then `$MCP_SERVER`, then
+`./nano_mcp_termux.py`, then `/tmp/nano-mcp-termux/nano_mcp_termux.py` -- so keep
+the second `git clone` above, or pass `MCP_SERVER=/path/to/server.py`. If none of
+the four exists, the script prints the path it looked for and exits 2.
+
 Scripts: [`scripts/measure_overhead.py`](../scripts/measure_overhead.py) ·
 [`scripts/probe_bench.py`](../scripts/probe_bench.py) ·
 [`scripts/token_probe.py`](../scripts/token_probe.py)

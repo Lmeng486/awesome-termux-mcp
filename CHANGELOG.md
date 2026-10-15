@@ -28,6 +28,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Correction note: the measured subject is `nano-mcp-termux` at `main` (`00df8af`),
   not the bare `v1.1.0` tag. The tag's catalog is ~1.3 KB; `a0030c5` rewrote the four
   tool descriptions and added annotations, which is what took it to ~3.6 KB.
+- Correction note: `measure_overhead.py` and `probe_bench.py` resolved the server
+  under test to `./nano_mcp_termux.py` only. This repository does not vendor that
+  file, so the bare commands in section 5 of the report wrote 2 bytes of output or
+  died with `BrokenPipeError` instead of producing a number. Both scripts now use
+  the same four-step resolver as `token_probe.py` (positional argument ->
+  `$MCP_SERVER` -> `./nano_mcp_termux.py` -> `/tmp/nano-mcp-termux/...`) and exit 2
+  with the path they looked for when nothing matches. Section 5 now shows the
+  second `git clone` that makes the bare invocation work.
+- Correction note: the JSON-RPC sizes printed by `probe_bench.py` are *compact*
+  re-serialisations (`separators=(",", ":")`), not the bytes the server writes to
+  stdio, and the token column in its section C is the legacy `chars/4` heuristic,
+  not the real-tokenizer figures in report section 2.5. Both are now labelled in
+  the script output, and the byte conventions are stated in the report.
 - `scripts/check_readme.py`: offline check for the directory table shape and for
   broken relative links.
 - GitHub Actions CI: protocol test on Python 3.9 to 3.13 plus the README check.
