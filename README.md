@@ -106,7 +106,7 @@ Same device. Findings (read-only tools only; `send_sms`/`make_call`/`set_clipboa
 - Repro: inside Termux `pkg install nodejs-lts termux-api`; `npm install`; `node server.js`; POST `initialize` with `Accept: application/json, text/event-stream`, keep the returned `mcp-session-id`, then `tools/list` / `tools/call`.
 ## Measured Reports
 
-- **[MCP on Mobile: Measured Overhead Report](./docs/MCP-ON-MOBILE-OVERHEAD.md)** — handshake cost, tool-catalog token cost, JSON-RPC vs protobuf wire size, and schema-scaling figures, all measured on the device below. Reproducible with `scripts/measure_overhead.py` + `scripts/probe_bench.py`.
+- **[MCP on Mobile: Measured Overhead Report](./docs/MCP-ON-MOBILE-OVERHEAD.md)** — handshake cost, tool-catalog token cost, JSON-RPC vs protobuf wire size, and schema-scaling figures, all measured on the device below. Reproducible with `scripts/measure_overhead.py` + `scripts/probe_bench.py` + `scripts/token_probe.py`.
 - **[Edge MCP Failure Taxonomy](./docs/EDGE-MCP-FAILURE-TAXONOMY.md)** — every way an MCP server actually breaks on Android, classified by root cause, each backed by a real-device case from this directory.
 
 ## Runtime Survival Guide (read before you connect anything)

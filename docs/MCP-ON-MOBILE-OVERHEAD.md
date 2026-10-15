@@ -7,8 +7,9 @@
 > re-run the whole thing on their own hardware in under a minute.
 
 **Measured on:** Xiaomi `23013RK75C` · Android 15 (SDK 35) · aarch64 · Termux 0.118.3 · Python 3.14.6
-**Subject under test:** [`nano-mcp-termux`](https://github.com/Lmeng486/nano-mcp-termux) v1.1.0 (4 tools, zero-dependency, single-file stdio server)
+**Subject under test:** [`nano-mcp-termux`](https://github.com/Lmeng486/nano-mcp-termux) `@ main` — 4 tools, zero-dependency, single-file stdio server. The file measured is `nano_mcp_termux.py` at commit `00df8af` (27 571 B, `sha256 34709c02…e34b5`). Its source still declares `SERVER_VERSION = "1.1.0"`, but it is the `main` revision that came **after** the v1.1.0 tag: `a0030c5` rewrote all four tool descriptions and added annotations, which is what moved the catalog from ~1.3 KB to ~3.6 KB. Quoting this report against the bare `v1.1.0` tag will not reproduce the numbers below.
 **Control environment:** PRoot Linux · Python 3.12.3 (same scripts, x86_64)
+**Token counts:** two real tokenizers, run **fully offline** — Qwen2.5 BPE and GPT-2 byte-level BPE (§1)
 
 ---
 
@@ -17,11 +18,11 @@
 | Question | Measured answer |
 |---|---|
 | Handshake cost (`initialize`) | **152 bytes** |
-| Tool catalog cost (`tools/list`, 4 tools) | **3 623 bytes ≈ 1 100 tokens** |
+| Tool catalog cost (`tools/list`, 4 tools) | **3 617 B** compact (3 714 B as written to the wire) — **798 tokens** (Qwen2.5) / **889 tokens** (GPT-2) |
 | Single tool call payload (`device_status`) | **437 bytes** (device) / 415 bytes (PRoot) |
 | Is JSON-RPC really "2–5 KB per call vs 200 B for protobuf"? | **No.** Measured gap is **3.3× (request)** and **1.3× (response)** |
 | Local stdio round-trip latency | **sub-millisecond** (p50 ≈ 0.12 ms) |
-| Do large tool catalogs eat the context window? | **Yes.** Extrapolated **~16 276 tokens** at 72 tools |
+| Do large tool catalogs eat the context window? | **Yes.** Extrapolated **~14 100 – 15 700 tokens** at 72 tools |
 
 Two of these overturn things that are commonly repeated online, and one of them
 **confirms** the biggest real worry for edge models. Details below.
@@ -40,10 +41,42 @@ All figures come from two stdlib-only scripts:
   zero protobuf dependency); (B) persistent-session latency over 20 `ping`
   round-trips; (C) schema scaling extrapolation.
 
-Byte counts are UTF-8 bytes of the exact bytes on the wire. Token counts are a
-**`chars / 4` heuristic, explicitly labelled as an estimate** — not a tokenizer
-count. Where a number is extrapolated rather than measured, it is marked
+Byte counts are UTF-8 bytes of the exact bytes on the wire. Token counts are
+**real tokenizer counts**, produced by `scripts/token_probe.py` running **fully
+offline** against two independent vocabularies:
+
+| Tokenizer | Vocabulary | Why it is included |
+|---|---:|---|
+| **Qwen2.5 BPE** | 151 665 | the most widely used open tokenizer family in edge LLM work |
+| **GPT-2 byte-level BPE** | 50 257 | the classic `cl100k`-era baseline; also the tokenizer `tiktoken`'s `gpt2` encoding reproduces |
+
+The two bracket the plausible range: the Qwen2.5 vocabulary is much larger and
+packs more JSON punctuation per token, so it is the **lower bound**; GPT-2 is the
+**upper bound**. Llama-family vocabularies could not be fetched from this network
+(HF mirror returned 403), so they are *not* claimed. The legacy `chars / 4`
+heuristic is printed alongside for continuity with earlier revisions of this
+report — note that it lands **above** both real tokenizers on compact JSON,
+because JSON punctuation is cheap to tokenize while the heuristic assumes prose.
+
+Where a number is extrapolated rather than measured, it is marked
 `(extrapolated)` in the output itself.
+
+### Byte-count conventions (three distinct numbers, do not conflate them)
+
+The same `tools/list` response yields three different byte counts depending on
+how you serialise it. All three are reported here on purpose:
+
+| Serialisation | Bytes | Used for |
+|---|---:|---|
+| **As written to the wire** (`json.dumps(obj, ensure_ascii=False)`, default separators) | **3 714** | what actually crosses stdio |
+| **Compact, `ensure_ascii=False`** | **3 617** | §2.5 schema-scaling math |
+| **Compact, `ensure_ascii=True`** | **3 623** | §2.2 catalog table (the historical number) |
+
+Earlier revisions of this report mixed the last two without saying so. The
+difference is real but tiny (`\uXXXX` escaping of the handful of non-ASCII
+characters in the descriptions); the wire form is larger still because the
+server uses `json.dumps`' default `", "` / `": "` separators rather than
+compact ones. **When comparing against a packet capture, use 3 714.**
 
 ### Reproduction
 
@@ -52,6 +85,14 @@ count. Where a number is extrapolated rather than measured, it is marked
 python3 scripts/measure_overhead.py            # human-readable
 python3 scripts/measure_overhead.py --json     # machine-readable
 python3 scripts/probe_bench.py
+python3 scripts/token_probe.py                 # real-tokenizer re-count (offline)
+```
+
+`token_probe.py` needs `tokenizers` plus two local vocabulary files; it performs
+**no network access**. Point it at any vocabulary you like:
+
+```bash
+TOKENIZER_FILE=/path/to/tokenizer.json python3 scripts/token_probe.py
 ```
 
 To point the probes at a different server:
@@ -66,27 +107,42 @@ MCP_SERVER=/path/to/your_server.py python3 scripts/probe_bench.py
 
 ### 2.1 Handshake floor: 152 bytes
 
-The `initialize` response is **152 bytes** — identical in PRoot (Py 3.12.3) and
-on the real device (Py 3.14.6). Handshaking is effectively free; there is no
-reason to avoid a fresh connection on a mobile transport for payload reasons.
+The `initialize` response is **152 bytes** in compact form (3 714-style wire form:
+**166 B**, since the server writes `json.dumps` with default separators) —
+identical in PRoot (Py 3.12.3) and on the real device (Py 3.14.6). Handshaking is
+effectively free; there is no reason to avoid a fresh connection on a mobile
+transport for payload reasons.
 
-### 2.2 Tool catalog: 3 623 bytes ≈ 1 100 tokens for 4 tools
+### 2.2 Tool catalog: 3 617 bytes, ~780–890 tokens, for 4 tools
 
-`tools/list` returns **3 623 bytes** for this server's 4 tools. Per-tool schema
-cost:
+`tools/list` returns **3 617 B** compact (`ensure_ascii=False`) — **3 623 B** with
+`ensure_ascii=True`, **3 714 B** as actually written to stdio. Real-tokenizer
+counts and per-tool schema cost:
 
-| Tool | Schema bytes | Est. tokens |
-|---|---:|---:|
-| `device_status` | 789 | 197 |
-| `server_health` | 727 | 181 |
-| `resolve_path` | 1 254 | 314 |
-| `path_adapter` | 798 | 200 |
-| **Total (4 tools)** | **3 623** | **~1 100** |
+| Tool | Schema bytes | Qwen2.5 tokens | GPT-2 tokens | `chars/4` (legacy) |
+|---|---:|---:|---:|---:|
+| `device_status` | 789 | 169 | 182 | 197 |
+| `server_health` | 727 | 155 | 175 | 181 |
+| `resolve_path` | 1 254 | 280 | 314 | 314 |
+| `path_adapter` | 798 | 177 | 200 | 200 |
+| **Total (4 tools)** | **3 617** | **781** | **871** | **892** |
 
-The heaviest tool (`resolve_path`, 1 254 B) is also the one with the richest
-argument surface — **schema cost tracks argument complexity, not tool count
-alone**. A server's tool catalog is *prepended context the model pays for on
-every session*, before it has done any work.
+*(Per-tool rows are the compact serialisation of each individual tool object; the
+total is the whole `tools/list` response, so it carries the extra `{"jsonrpc",
+"id", "result": {...}}` envelope — hence 781/871 rather than the naive sum
+798/889. Both figures are printed by the probe.)*
+
+Two things worth noticing:
+
+- The legacy `chars / 4` column **over-estimates** by ~15–25 % here, not because
+  it is wrong in general but because JSON-RPC schemas are punctuation-dense, and
+  BPE vocabularies merge that punctuation aggressively. Anyone who quoted
+  "≈1 100 tokens" from an earlier revision should use **~800 (Qwen2.5)** to
+  **~890 (GPT-2)**.
+- The heaviest tool (`resolve_path`, 1 254 B) is also the one with the richest
+  argument surface — **schema cost tracks argument complexity, not tool count
+  alone**. A server's tool catalog is *prepended context the model pays for on
+  every session*, before it has done any work.
 
 ### 2.3 A single tool call is hundreds of bytes, not kilobytes
 
@@ -96,6 +152,9 @@ A real `device_status` call:
 |---|---:|---:|
 | Real device (Py 3.14.6) | **437** | 0.674 s / 0.786 s* |
 | PRoot (Py 3.12.3) | **415** | 0.432 s |
+
+*(Both figures are compact serialisations, consistent with §2.2. The same PRoot
+response as actually written to stdio is **424 B** — see the convention table in §1.)*
 
 \* two independent runs, showing run-to-run variance.
 
@@ -135,31 +194,35 @@ cost** (§2.5).
 
 ### 2.5 ✅ The real cost is schema scaling — and the worry is justified
 
-Measured per-tool schema cost: **904.2 bytes/tool** (3 617 B ÷ 4 tools).
-Extrapolated to the tool counts of real Termux MCP servers listed in this
-directory:
+Measured per-tool schema cost: **904.2 bytes/tool** (3 617 B ÷ 4 tools), which is
+**195.3 Qwen2.5 tokens/tool** or **217.8 GPT-2 tokens/tool**. Extrapolated to the
+tool counts of real Termux MCP servers listed in this directory:
 
-| Tools | Est. catalog bytes | Est. tokens | Source |
-|---:|---:|---:|---|
-| 4 | 3 617 | ~904 | **measured** |
-| 19 | 17 181 | ~4 295 | extrapolated |
-| 29 | 26 223 | ~6 556 | extrapolated |
-| 38 | 34 362 | ~8 590 | extrapolated |
-| 52 | 47 021 | ~11 755 | extrapolated |
-| 72 | 65 106 | ~16 276 | extrapolated |
+| Tools | Est. catalog bytes | Qwen2.5 tokens | GPT-2 tokens | Source |
+|---:|---:|---:|---:|---|
+| 4 | 3 617 | 781 | 871 | **measured** |
+| 19 | 17 181 | 3 710 | 4 137 | extrapolated |
+| 29 | 26 223 | 5 662 | 6 315 | extrapolated |
+| 38 | 34 362 | 7 420 | 8 274 | extrapolated |
+| 52 | 47 021 | 10 153 | 11 323 | extrapolated |
+| 72 | 65 106 | 14 058 | 15 678 | extrapolated |
 
 *(Extrapolation assumes uniform per-tool cost; real catalogs vary with argument
 complexity — treat these as order-of-magnitude, which is exactly how they are
-labelled in the script output.)*
+labelled in the script output. The n = 4 token cells are the sum over the four
+per-tool blobs; measuring the whole `tools/list` envelope instead adds ~17 tokens
+for the `{"jsonrpc","id","result":…}` wrapper, giving 798 / 889.)*
 
 The 19 / 29 / 38 / 52 / 72 columns are not arbitrary: they are the **actual
 tool counts of the five third-party servers verified in this directory's main
 README**. The mapping is deliberate — a 72-tool server projects to roughly
-**16 276 tokens of catalog** before a single call is made.
+**14 000 – 15 700 tokens of catalog** before a single call is made.
 
-**Verdict: confirmed.** For a small edge model with a 4 K–8 K context window,
-a large tool catalog is not a minor overhead — it is *most of the window*. This,
-not the wire encoding, is the real mobile/edge MCP problem.
+**Verdict: confirmed, with a correction.** For a small edge model with a 4 K–8 K
+context window, a large tool catalog is not a minor overhead — it is *most of the
+window*. This, not the wire encoding, is the real mobile/edge MCP problem. But the
+earlier `chars / 4` estimate of ~16 276 tokens at 72 tools was **too pessimistic**:
+real tokenizers land ~4–14 % lower, because JSON punctuation is cheap to encode.
 
 ### 2.6 Local stdio latency is negligible
 
@@ -183,7 +246,8 @@ directed at subprocess spawn cost (§2.3) and model inference, not at the pipe.
    *catalog* before the *codec*.
 2. **Tool catalog size is the budget that matters.** Every tool a server exposes
    is context the model pays for on every session. At ~904 B/tool, a 72-tool
-   server is ~16 K tokens — fatal for 4 K–8 K edge windows.
+   server is **~14 100 – 15 700 tokens** (Qwen2.5 – GPT-2, §2.5) — fatal for
+   4 K–8 K edge windows.
 3. **Split large servers.** Expose a small "core" tool set by default and gate
    the rest behind a progressive-disclosure tool, rather than shipping 72
    schemas up front.
@@ -196,8 +260,11 @@ directed at subprocess spawn cost (§2.3) and model inference, not at the pipe.
 
 ## 4. Caveats (read before quoting)
 
-- **Token counts are `chars / 4` heuristics**, explicitly labelled as estimates.
-  A real tokenizer will differ; the byte counts, however, are exact.
+- **Token counts come from two real tokenizers, run fully offline** — Qwen2.5 BPE
+  (lower bound) and GPT-2 byte-level BPE (upper bound); the legacy `chars / 4`
+  heuristic is kept only as a comparison column and is *not* the reported figure.
+  Llama-family vocabularies are **not claimed** (the HF mirror returned 403).
+  Byte counts are exact; token counts vary by vocabulary, so quote a range.
 - **§2.5 beyond 4 tools is extrapolation**, not measurement. It assumes uniform
   per-tool cost and is marked as such in the script output.
 - **Latency and round-trip figures vary run to run** with device load; two runs
@@ -214,10 +281,11 @@ git clone https://github.com/Lmeng486/awesome-termux-mcp
 cd awesome-termux-mcp
 python3 scripts/measure_overhead.py
 python3 scripts/probe_bench.py
+python3 scripts/token_probe.py   # offline real-tokenizer re-count
 ```
-
 Scripts: [`scripts/measure_overhead.py`](../scripts/measure_overhead.py) ·
-[`scripts/probe_bench.py`](../scripts/probe_bench.py)
+[`scripts/probe_bench.py`](../scripts/probe_bench.py) ·
+[`scripts/token_probe.py`](../scripts/token_probe.py)
 
 *Part of the [awesome-termux-mcp](https://github.com/Lmeng486/awesome-termux-mcp)
 verified-on-device series. Companion: [nano-mcp-termux](https://github.com/Lmeng486/nano-mcp-termux).*

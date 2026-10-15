@@ -13,9 +13,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `docs/EDGE-MCP-FAILURE-TAXONOMY.md`: F1–F9 root-cause taxonomy of how MCP
   servers actually break on Android, distilled from the five third-party
   verifications in this directory.
-- `scripts/measure_overhead.py`, `scripts/probe_bench.py`: the stdlib-only probes
-  that produced every number in the overhead report (re-runnable, `MCP_SERVER=`
-  accepts any server).
+- `scripts/measure_overhead.py`, `scripts/probe_bench.py`, `scripts/token_probe.py`:
+  the stdlib-only probes that produced every number in the overhead report
+  (re-runnable, `MCP_SERVER=` accepts any server). `token_probe.py` re-counts the
+  tool catalog with two real tokenizers (Qwen2.5 BPE, GPT-2 byte-level BPE) and is
+  **fully offline** — `tiktoken` is deliberately not used, because fetching its BPE
+  files needs network access. Point it at another vocabulary with `TOKENIZER_FILE=`.
+- Correction note: the report's earlier token column was a `chars / 4` heuristic
+  (≈1 100 tokens for 4 tools, ≈16 276 extrapolated to 72). Real tokenizers put the
+  same payload at **798 (Qwen2.5) – 889 (GPT-2)** for 4 tools and **~14 058 – 15 678**
+  at 72, i.e. the heuristic **over-estimated by ~15–25 %** on compact JSON. The
+  commit message of `f569449` quotes the old figures; that commit is left as-is for
+  history, and this changelog entry is the correction of record.
+- Correction note: the measured subject is `nano-mcp-termux` at `main` (`00df8af`),
+  not the bare `v1.1.0` tag. The tag's catalog is ~1.3 KB; `a0030c5` rewrote the four
+  tool descriptions and added annotations, which is what took it to ~3.6 KB.
 - `scripts/check_readme.py`: offline check for the directory table shape and for
   broken relative links.
 - GitHub Actions CI: protocol test on Python 3.9 to 3.13 plus the README check.
