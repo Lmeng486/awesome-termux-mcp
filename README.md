@@ -109,6 +109,7 @@ Same device. Findings (read-only tools only; `send_sms`/`make_call`/`set_clipboa
 - **[MCP on Mobile: Measured Overhead Report](./docs/MCP-ON-MOBILE-OVERHEAD.md)** — handshake cost, tool-catalog token cost, JSON-RPC vs protobuf wire size, and schema-scaling figures, all measured on the device below. Reproducible with `scripts/measure_overhead.py` + `scripts/probe_bench.py` + `scripts/token_probe.py`.
 - **[Edge MCP Failure Taxonomy](./docs/EDGE-MCP-FAILURE-TAXONOMY.md)** — every way an MCP server actually breaks on Android, classified by root cause, each backed by a real-device case from this directory.
 
+- **[Quantization Decay, Measured: SKILL.md Trigger Rate — Q4_K_M vs Q8_0 (MiniCPM5-2B on Termux)](./docs/QUANT-DECAY-MINICPM5.md)** — does quantization break agent tool-calling on-device, and can a bigger token budget buy the accuracy back? Measured end to end: decay lands at the decision layer (trigger rate 66.7% vs 81.5%), not the format layer (parse rate 100% at both quants); EMPTY_THINKING is a token-budget problem, and raising max_tokens 384→512 lifts the trigger rate to 88.9% while saving 1.19GB RAM vs Q8_0. Reproducible with the companion repo [`skillmd-termux`](https://github.com/Lmeng486/skillmd-termux) (`skillmd.sh` + `run_tests.sh` + `posthoc.py`) (see the report's Reproduce section).
 ## Runtime Survival Guide (read before you connect anything)
 
 ### Third-party verification: `xlisp/termux-mcp-server` (52 tools)

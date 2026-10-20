@@ -47,6 +47,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Issue forms for new listings and corrections, a pull-request checklist,
   `CONTRIBUTING.md`, `SECURITY.md` and this changelog.
 
+- `docs/QUANT-DECAY-MINICPM5.md`: third measured report — quantization decay of
+  agent tool-triggering on-device (MiniCPM5-2B, Q4_K_M vs Q8_0 on the SKILL.md
+  trigger path, 84 raw model outputs). Decay lands at the decision layer
+  (trigger rate 66.7% vs 81.5%), not the format layer (parse rate 100% at both
+  quants); EMPTY_THINKING is proven to be a token-budget problem, and raising
+  max_tokens 384→512 buys the trigger rate back to 88.9% while saving 1.19GB
+  RAM vs Q8_0 (trigger-rate dimension only — see the report's extrapolation
+  boundary). Reproducible with the companion repo skillmd-termux (see the
+  report's Reproduce section).
 ## [0.1.0] - 2026-10-12
 
 ### Added
