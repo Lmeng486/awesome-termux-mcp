@@ -180,6 +180,7 @@ Listings must not require disabling security mechanisms, or permissions beyond w
 ## Related
 
 - [AI-Android-Playbook](https://github.com/Lmeng486/AI-Android-Playbook) — companion repo: agent pitfall protocols & a runtime interceptor harness for Android.
+- [skillmd-termux](https://github.com/Lmeng486/skillmd-termux) — single-file `SKILL.md` loader for Termux: one POSIX shell script to install, verify, catalog, list and `call` on-device skills from an agent, with no runtime dependencies.
 
 ## License
 
