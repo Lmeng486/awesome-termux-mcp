@@ -56,6 +56,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   RAM vs Q8_0 (trigger-rate dimension only — see the report's extrapolation
   boundary). Reproducible with the companion repo skillmd-termux (see the
   report's Reproduce section).
+- Upstream submission of that report: [OpenBMB/MiniCPM#388](https://github.com/OpenBMB/MiniCPM/issues/388) (open) — the
+  maintainer-facing thread carrying the same numbers. A duplicate posted
+  seconds later was closed by its author as
+  [#389](https://github.com/OpenBMB/MiniCPM/issues/389), so #388 is the
+  single canonical thread.
+
 ## [0.1.0] - 2026-10-12
 
 ### Added
