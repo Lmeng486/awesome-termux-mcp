@@ -181,6 +181,7 @@ Listings must not require disabling security mechanisms, or permissions beyond w
 
 - [AI-Android-Playbook](https://github.com/Lmeng486/AI-Android-Playbook) — companion repo: agent pitfall protocols & a runtime interceptor harness for Android.
 - [skillmd-termux](https://github.com/Lmeng486/skillmd-termux) — single-file `SKILL.md` loader for Termux: one POSIX shell script to install, verify, catalog, list and `call` on-device skills from an agent, with no runtime dependencies.
+- [Showdev: A zero-dependency MCP server that runs on Android Termux (Dev.to)](https://dev.to/lmeng486/showdev-a-zero-dependency-mcp-server-that-runs-on-android-termux-28fe) — announcement write-up covering this directory and the nano server.
 
 ## License
 

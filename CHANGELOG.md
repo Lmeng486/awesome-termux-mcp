@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 ### Added
+- README: linked the Dev.to announcement write-up (Showdev: A zero-dependency MCP server that runs on Android Termux) under Related.
 - `docs/MCP-ON-MOBILE-OVERHEAD.md`: real-device measured overhead report
   (handshake bytes, tool-catalog token cost, JSON-RPC vs protobuf wire size,
   schema-scaling extrapolation). Refutes the widely-quoted "2–5 KB per call vs
