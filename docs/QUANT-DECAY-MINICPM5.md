@@ -99,6 +99,9 @@ Key observations:
 - One model family only (MiniCPM5-2B); conclusions do not transfer to other models.
 - **Relation to existing quantization measurements (extrapolation boundary)**: external MiniCPM5-2B quantization measurements exist, but at different endpoints — the OpenTeams report (Guido Imperiale, 2026-09-22, openteams.com/engineering-blog/minicpm5-2b-quantization-report/) measures KLD and Same-Sampled-Token, finding Q6_K indistinguishable from F16 and IQ4_XS the last usable quant before the quality cliff; a Tencent Cloud hands-on (cloud.tencent.cn/developer/article/2741314) verified Q4_K_M can make a tool call (a single get_weather demo), with no Q4/Q8 trigger-rate comparison and no budget variable. **Nobody outside has measured "quant level × max_tokens budget → agent tool-trigger rate"** — that is the dimension on which this report's three-way comparison is unique. Extrapolation boundary: the conclusions hold for the SKILL.md trigger scenario + this harness's prompt format; they do not extrapolate to "Q4 beats Q8 overall" (on KLD, Q8_0 is indeed better) nor to "all agent capabilities of MiniCPM5-2B".
 
+## Upstream response
+- 2026-10-23: the report was filed upstream as [OpenBMB/MiniCPM#388](https://github.com/OpenBMB/MiniCPM/issues/388) and **reviewed and closed as completed by the MiniCPM maintainers**, who confirmed the experiments are reproducible and the limitations clearly documented. Thank-you note from the maintainer on the issue thread.
+- What this does *not* mean: it is not an endorsement of the conclusion, not a product decision, and not a claim that Q4_K_M is preferred upstream. The scope stays exactly as written under Scope & limitations above (one model family, one trigger scenario, n=27 per quant, point estimates +/-17pp).
 ## Reproduce
 
 ```bash
