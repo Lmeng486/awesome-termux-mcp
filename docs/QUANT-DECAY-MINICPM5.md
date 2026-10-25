@@ -102,6 +102,7 @@ Key observations:
 ## Upstream response
 - 2026-10-23: the report was filed upstream as [OpenBMB/MiniCPM#388](https://github.com/OpenBMB/MiniCPM/issues/388) and **reviewed and closed as completed by the MiniCPM maintainers**, who confirmed the experiments are reproducible and the limitations clearly documented. Thank-you note from the maintainer on the issue thread.
 - What this does *not* mean: it is not an endorsement of the conclusion, not a product decision, and not a claim that Q4_K_M is preferred upstream. The scope stays exactly as written under Scope & limitations above (one model family, one trigger scenario, n=27 per quant, point estimates +/-17pp).
+
 ## Reproduce
 
 ```bash
