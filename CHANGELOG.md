@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 ### Added
+- `docs/MCP-SURVIVAL-SURVEY-PROTOCOL.md`: pre-registered test protocol for the upcoming "MCP survival survey" — frozen pass criteria (L0 install / L1 handshake / L2 real call / L3 token+RSS overhead), measurement procedure, first-batch predictions (5 servers), and the survival-card template. Results will land as a separate report; this file is committed before any testing to prevent post-hoc rationalisation.
 - README: linked the Dev.to announcement write-up (Showdev: A zero-dependency MCP server that runs on Android Termux) under Related.
 - `docs/MCP-ON-MOBILE-OVERHEAD.md`: real-device measured overhead report
   (handshake bytes, tool-catalog token cost, JSON-RPC vs protobuf wire size,
