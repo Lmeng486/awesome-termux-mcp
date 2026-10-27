@@ -55,7 +55,7 @@ Error: Unsupported platform: android
     at launchApp.ts / recorderApp.ts __init__
 ```
 
-The crash happens at **module import time**, while computing the browser cache directory — the server never sees a single JSON-RPC line. Playwright's platform switch simply has no `android` branch. No code patch needed: `PLAYWRIGHT_BROWSERS_PATH=$HOME/pw-browsers` bypasses the default-cache computation entirely → L1 PASS with all 25 tools listed. Classified **F7 + F9** (platform assumption + no graceful degradation). One env var away from working; L2+ depends on having browser binaries under Termux, which we did not pursue further in this round.
+The crash happens during **module evaluation** — the eager class-field initializer IIFE for `registryDirectory` (coreBundle.js:34353) runs at load time, and with no env var it calls `defaultRegistryDirectory()` → `computeDefaultCacheDirectory()`, whose platform switch has no `android` branch and throws. The server never sees a single JSON-RPC line. This is a **residual path**: upstream PR #41942 (commit `3e14efd6`, fixing #41852) already made `defaultCacheDirectory()` lazy (`??=`), but the `registryDirectory` initializer remains eager — that fix covers one of the two call paths only. No code patch needed: `PLAYWRIGHT_BROWSERS_PATH=0` and `PLAYWRIGHT_BROWSERS_PATH=$HOME/pw-browsers` both bypass the default-cache computation entirely and produce **byte-identical** transcripts (sha256 `cd2d27c5…`) listing all 25 tools. Classified **F7 + F9** (platform assumption + no graceful degradation). One env var away from working; L2+ depends on having browser binaries under Termux, which we did not pursue further in this round. Evidence: `measurements/survival-survey/bare-crash.log` (sha256 `3a2b6a31…`), `env0-tools-list.log` / `homepw-tools-list.log`, and `shipped-coreBundle-excerpt.txt` (verbatim source excerpts anchored to coreBundle.js sha256 `cd6730be…`).
 
 ### Card 4 — github-mcp-server (46 tools) ⚠️
 
@@ -158,25 +158,29 @@ nano-mcp-termux runs natively with 4 tools at 16,064 KB RSS — roughly 2.4× li
 
 Per the survey protocol, nothing goes upstream without the repo owner reading it first. Two drafts prepared:
 
-### Draft A — playwright/mcp: "Server crashes at import on Android: 'Unsupported platform: android' (workaround available)"
+### Draft A — playwright/mcp: "Server crashes at module evaluation on Android: 'Unsupported platform: android' (residual path after #41942; workaround available)"
 
-> **Summary:** `@playwright/mcp` crashes at module import time on Android/Termux (aarch64, Node v26.4.0) with `Error: Unsupported platform: android` thrown from `computeDefaultCacheDirectory` (`playwright-core/lib/coreBundle.js:33904` ← `defaultCacheDirectory` :33907 ← `defaultRegistryDirectory` :33910 ← `launchApp.ts`/`recorderApp.ts` `__init__`). The server never processes a single JSON-RPC message.
+> **Summary:** `@playwright/mcp` (0.0.83, running `playwright-core` 1.64.0-alpha-1790635538000) crashes during **module evaluation** on Android/Termux (aarch64, Node v26.4.0) with `Error: Unsupported platform: android`. The eager class-field initializer IIFE for `registryDirectory` (`coreBundle.js:34353`) runs at load time; with `PLAYWRIGHT_BROWSERS_PATH` unset it takes the `else` branch → `defaultRegistryDirectory()` (:33910) → `defaultCacheDirectory()` (:33907) → `computeDefaultCacheDirectory()` (:33904), whose platform switch has no `android` branch and throws — before any JSON-RPC traffic. This is a **residual path**: PR #41942 (commit `3e14efd6`, fixing #41852) made `defaultCacheDirectory()` lazy (`??=`), but the `registryDirectory` initializer remains eager, so that fix covers one of the two call paths only. The crash reproduces on a build fetched more than two months after the fix commit.
 >
-> **Repro:** Termux (Android 15, SDK 35, aarch64), `npx @playwright/mcp@latest` → crash before any stdio traffic.
+> **Stack (captured):** `computeDefaultCacheDirectory` (`coreBundle.js:33904`) ← `defaultCacheDirectory` (:33907) ← `defaultRegistryDirectory` (:33910) ← `registryDirectory` IIFE (:34361) ← `launchApp.ts` (:35201) ← `recorderApp.ts` (:52297).
 >
-> **Workaround:** `PLAYWRIGHT_BROWSERS_PATH=$HOME/pw-browsers npx @playwright/mcp@latest` bypasses the default-cache computation and the server lists all 25 tools.
+> **Repro:** Termux (Android 15, SDK 35, aarch64), Node v26.4.0, `npx @playwright/mcp@latest` → crash before any stdio traffic. Bare-start stderr captured as `bare-crash.log`.
 >
-> **Suggestion:** treat an explicitly-set `PLAYWRIGHT_BROWSERS_PATH` as "platform handled by the user" before the platform switch throws, or add an `android` branch to the platform map. Happy to send the full stack trace and environment details if useful.
+> **Workaround:** set `PLAYWRIGHT_BROWSERS_PATH` to anything — `=0` or `=$HOME/pw-browsers` both work and produce **byte-identical** transcripts (sha256 `cd2d27c5…`) listing all 25 tools. The two values are equivalent because both take an env branch of the IIFE and never reach the platform switch.
+>
+> **Evidence (hash-anchored):** verbatim excerpts of the shipped bundle at `coreBundle.js` lines 33897–33912 and 34350–34372 (file sha256 `cd6730be…`, 3,573,451 B), the bare-start crash log (sha256 `3a2b6a31…`), and the two `tools/list` transcripts (sha256 `cd2d27c5…`). Anyone can re-derive the excerpts from the same npx cache path and diff against the hash.
+>
+> **Suggestion:** any of — (a) treat an explicitly-set `PLAYWRIGHT_BROWSERS_PATH` as "platform handled by the user" before the platform switch throws (a one-line guard in the `registryDirectory` initializer); (b) make the `registryDirectory` initializer lazy the same way #41942 did for `defaultCacheDirectory()`, so the fix covers both call paths; (c) add an `android` branch to the platform map. Happy to send the full stack trace and environment details; artifacts are hash-anchored and reproducible.
 
-### Draft B — mobile-next/mobile-mcp: "Four-level install/launch failure chain on Android/Termux (three workarounds, one open)"
+### Draft B — mobile-next/mobile-mcp: "ADB path resolution and TMPDIR handling on Android/Termux (one workaround applied, one open)"
 
 > **Summary:** installing and launching `mobile-mcp` on Android 15 / Termux (aarch64, node v26.4.0, npm 11.20.0) hits four independent failures:
 > 1. `esbuild` postinstall script blocked by npm config;
 > 2. nested `sharp` attempts a wasm32 build and crashes (bypassed by renaming the nested copy);
 > 3. ADB path resolution hardcodes a desktop layout (bypassed by faking `ANDROID_HOME`);
-> 4. `adb` daemon rejects the default `TMPDIR` (open — needs a real wireless-debugging pairing to test further).
+> 4. `adb` daemon rejects the default `TMPDIR` (open — observed on device but **not yet captured as a standalone log**; needs a real wireless-debugging pairing to reproduce and attach evidence).
 >
-> After (1)–(3) the server installs and lists all 9 tools. Full failure chain, commands and logs available; happy to open a PR for the path-resolution fix if the maintainers want it.
+> Items (1)–(2) are generic npm/native-build friction rather than Android-specific; the Android-specific core of this report is (3)–(4). After (1)–(3) the server installs and lists all 9 tools. Full failure chain, commands and logs available; happy to open a PR for the path-resolution fix if the maintainers want it.
 
 ## Reproduce
 
@@ -188,6 +192,7 @@ All measurements were made on-device with the scripts in `scripts/` and raw arti
 - `measurements/survival-survey/{ctx7,fc,gh,mm,pw}_tools.json` — raw `tools/list` payloads (compact, `ensure_ascii=False`), sha256-tracked in the summary files.
 - `measurements/survival-survey/probe_mm.json` — mobile-mcp L1/L3 probe output (handshake PASS, 9 tools, peak RSS 115,600 KB).
 - `measurements/survival-survey/l1gh.json` — github-mcp-server L1/L3 probe output (46 tools, peak RSS 39,316 KB).
+- `measurements/survival-survey/{bare-crash.log, env0-tools-list.log, homepw-tools-list.log, shipped-coreBundle-excerpt.txt, versions.txt, retest-method.sh}` — playwright retest artifacts, sha256-anchored (see Card 3).
 - Tokenizer assets: Qwen2.5 `tokenizer.json` (7,031,645 B), GPT-2 `vocab.json` (1,042,301 B) + `merges.txt` (456,318 B), all used fully offline.
 
 Frozen protocol: `docs/MCP-SURVIVAL-SURVEY-PROTOCOL.md` (commit `e72cf6e`). Failure taxonomy: `docs/EDGE-MCP-FAILURE-TAXONOMY.md`.
