@@ -76,8 +76,24 @@ Four-level failure chain, each level individually diagnosed and worked around:
 
 1. `esbuild` postinstall script blocked by npm config → **F1/F7** (install-time platform assumption).
 2. Nested `sharp` tries to build wasm32 binaries and crashes → **F1/F7**; bypassed by renaming the nested copy.
-3. ADB path resolution hardcodes a desktop layout → **F6/F8**; bypassed by faking `ANDROID_HOME`.
-4. `adb` daemon refuses the default `TMPDIR` → **F2/F6**.
+3. ADB path resolution hardcodes a desktop layout **and never consults `PATH`** → **F6/F8**; bypassed by making one of its hardcoded candidates physically exist (a symlink). `ANDROID_HOME` is *not* what fixes it — see the A/B below.
+4. `adb` daemon refuses the default `TMPDIR` → **F2/F6**. (open — observed on device, no standalone log captured yet; needs a real wireless-debugging pairing to reproduce and attach evidence.)
+
+**A/B proof for item 3** (`mm-adbpath-probe.sh`, transcript `mm-adbpath-probe.log`, both hash-anchored). The probe changes exactly one variable — whether `$HOME/android-sdk/platform-tools/adb` exists — and nothing else. `ANDROID_HOME` is `<unset>` in all three runs:
+
+```
+[STEP 2] candidate list as computed by mobile-use getPotentialADBPaths() else-branch
+  MISSING  /usr/local/bin/adb
+  MISSING  /usr/bin/adb
+  MISSING  $HOME/android-sdk/platform-tools/adb
+[STEP 3] baseline run, no workaround   EXIT=1  stderr_bytes=1072
+[STEP 4] apply workaround              .../android-sdk/platform-tools/adb -> .../usr/bin/adb
+[STEP 5] rerun with only the symlink   EXIT=0  stderr_bytes=0
+[STEP 6] remove workaround, rerun      EXIT=1  stderr_bytes=1072
+[VERDICT] baseline EXIT=1 / with-symlink EXIT=0 / after-cleanup EXIT=1
+```
+
+Why this is the whole story: on Android `process.platform === "android"`, so the `win32` / `darwin` / `linux` branches of `getPotentialADBPaths()` all miss and the `else` branch yields exactly those three candidates. Termux is an FHS variant where `/usr`, `/usr/bin`, `/usr/local` and `/usr/local/bin` **do not exist**, so the first two are physically impossible and the third is the only reachable one. `adb` *is* on `PATH` (`$PREFIX/bin/adb`) — but the candidate list is a fixed array passed to `existsSync()`, with no `PATH` scan anywhere, so a working `adb` on `PATH` buys nothing. The bypass is therefore filesystem-level and fully reversible: `ln -s` flips 1→0, `rm -f` + `rmdir` flips it back to 1.
 
 After patches: L0 ✅, L1 ✅ (9 tools listed: `mobile_tap`, `mobile_swipe`, `mobile_key_press`, …), peak RSS 115,600 KB (`probe_mm.json`) — nearly 3× github-mcp-server's 39,316 KB while carrying the lightest schema of the batch (3,031 B). **L2 requires a real wireless-debugging pairing dialog confirmed by the user**, which is the only step in this survey we could not automate. Provisional until paired.
 
@@ -172,15 +188,35 @@ Per the survey protocol, nothing goes upstream without the repo owner reading it
 >
 > **Suggestion:** any of — (a) treat an explicitly-set `PLAYWRIGHT_BROWSERS_PATH` as "platform handled by the user" before the platform switch throws (a one-line guard in the `registryDirectory` initializer); (b) make the `registryDirectory` initializer lazy the same way #41942 did for `defaultCacheDirectory()`, so the fix covers both call paths; (c) add an `android` branch to the platform map. Happy to send the full stack trace and environment details; artifacts are hash-anchored and reproducible.
 
-### Draft B — mobile-next/mobile-mcp: "ADB path resolution and TMPDIR handling on Android/Termux (one workaround applied, one open)"
+### Draft B — mobile-next/mobile-mcp: "ADB path resolution never consults `PATH` on Android/Termux, and `ANDROID_HOME` doesn't help (one workaround applied, one open)"
 
 > **Summary:** installing and launching `mobile-mcp` on Android 15 / Termux (aarch64, node v26.4.0, npm 11.20.0) hits four independent failures:
 > 1. `esbuild` postinstall script blocked by npm config;
 > 2. nested `sharp` attempts a wasm32 build and crashes (bypassed by renaming the nested copy);
-> 3. ADB path resolution hardcodes a desktop layout (bypassed by faking `ANDROID_HOME`);
-> 4. `adb` daemon rejects the default `TMPDIR` (open — observed on device but **not yet captured as a standalone log**; needs a real wireless-debugging pairing to reproduce and attach evidence).
+> 3. ADB path resolution hardcodes a desktop layout **and never scans `PATH`** (bypassed by making one hardcoded candidate exist — see below);
+> 4. `adb` daemon rejects the default `TMPDIR` (open — observed on device, no standalone log captured yet; needs a real wireless-debugging pairing to reproduce and attach evidence).
 >
-> Items (1)–(2) are generic npm/native-build friction rather than Android-specific; the Android-specific core of this report is (3)–(4). After (1)–(3) the server installs and lists all 9 tools. Full failure chain, commands and logs available; happy to open a PR for the path-resolution fix if the maintainers want it.
+> Items (1)–(2) are generic npm/native-build friction rather than Android-specific; the Android-specific core of this report is (3)–(4).
+>
+> **Detail on (3), because the obvious fix does not work.** On Android, `process.platform === "android"`, so every branch of `getPotentialADBPaths()` except the `else` misses. The `else` branch returns exactly three candidates: `/usr/local/bin/adb`, `/usr/bin/adb`, `$HOME/android-sdk/platform-tools/adb` — plus an `ANDROID_HOME`-derived entry when that variable is set. Two things follow:
+>
+> - Termux is an FHS variant: `/usr`, `/usr/bin`, `/usr/local` and `/usr/local/bin` **do not exist**. So the first two candidates are physically impossible there.
+> - The candidate list is a fixed array handed to `existsSync()`; there is **no `PATH` lookup anywhere**. `adb` is installed and working on `PATH` (`$PREFIX/bin/adb`), and that buys nothing.
+>
+> I verified this with a reversible A/B on device (`mm-adbpath-probe.sh`, transcript `mm-adbpath-probe.log`, both hash-anchored). Exactly one variable changes — whether `$HOME/android-sdk/platform-tools/adb` exists. `ANDROID_HOME` is `<unset>` throughout, so this is *not* the "fake `ANDROID_HOME`" trick:
+>
+> ```
+> [STEP 3] baseline, no workaround        EXIT=1  stderr_bytes=1072  (Error: ADB not found…)
+> [STEP 4] ln -s $PREFIX/bin/adb  $HOME/android-sdk/platform-tools/adb
+> [STEP 5] rerun, only the symlink added  EXIT=0  stderr_bytes=0
+> [STEP 6] rm the symlink, rerun          EXIT=1  stderr_bytes=1072
+> ```
+>
+> Failure is deterministic, the bypass is purely filesystem-level, and it is fully reversible. After (1)–(3) the server installs and lists all 9 tools.
+>
+> **Suggested fix (small):** expose the existing `adbPath` option all the way up. `ADBClient` already accepts `options.adbPath` and skips resolution entirely when it is present, but `dist/mcp_server.js` constructs it with zero arguments (`new ADBClient()`), so the escape hatch is unreachable from the shipped server — roughly a two-line change (read `process.env.ADB_PATH` or an `--adb-path` flag in `mcp_server.js` and pass it through). A secondary hardening would be to append a `PATH` scan to `getPotentialADBPaths()`, since on Android/Termux that is where `adb` actually lives.
+>
+> Full failure chain, commands and logs available; happy to open a PR for the `adbPath` plumbing if the maintainers want it.
 
 ## Reproduce
 
@@ -193,6 +229,8 @@ All measurements were made on-device with the scripts in `scripts/` and raw arti
 - `measurements/survival-survey/probe_mm.json` — mobile-mcp L1/L3 probe output (handshake PASS, 9 tools, peak RSS 115,600 KB).
 - `measurements/survival-survey/l1gh.json` — github-mcp-server L1/L3 probe output (46 tools, peak RSS 39,316 KB).
 - `measurements/survival-survey/{bare-crash.log, env0-tools-list.log, homepw-tools-list.log, shipped-coreBundle-excerpt.txt, versions.txt, retest-method.sh}` — playwright retest artifacts, sha256-anchored (see Card 3).
+- `measurements/survival-survey/mm-bare-crash.log` — mobile-mcp bare start, module-load throw (1,055 B, sha256 `196a98674cf0…`). Same failure mode that the A/B probe reproduces as its baseline.
+- `measurements/survival-survey/mm-adbpath-probe.sh` + `mm-adbpath-probe.log` — the reversible A/B behind Card 5 item 3 (script 2,540 B / sha256 `9fc35379f239…`; transcript 2,751 B / sha256 `9444dfdfc582…`). Self-contained: prints the environment, enumerates the three `else`-branch candidates, then runs baseline → symlink → cleanup. Re-runnable on any Termux install, no patching of `node_modules`.
 - Tokenizer assets: Qwen2.5 `tokenizer.json` (7,031,645 B), GPT-2 `vocab.json` (1,042,301 B) + `merges.txt` (456,318 B), all used fully offline.
 
 Frozen protocol: `docs/MCP-SURVIVAL-SURVEY-PROTOCOL.md` (commit `e72cf6e`). Failure taxonomy: `docs/EDGE-MCP-FAILURE-TAXONOMY.md`.

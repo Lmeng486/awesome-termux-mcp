@@ -1,0 +1,17 @@
+/data/data/com.termux/files/home/survival/mobilemcp2/node_modules/mobile-use/dist/index.js:214
+      throw new Error(
+      ^
+
+Error: ADB not found. Please ensure Android SDK is installed and properly configured.
+    at ADBClient.getAdbPath (/data/data/com.termux/files/home/survival/mobilemcp2/node_modules/mobile-use/dist/index.js:214:13)
+    at new ADBClient (/data/data/com.termux/files/home/survival/mobilemcp2/node_modules/mobile-use/dist/index.js:205:27)
+    at Object.<anonymous> (/data/data/com.termux/files/home/survival/mobilemcp2/node_modules/mobile-mcp/dist/mcp_server.js:8:13)
+    at Module._compile (node:internal/modules/cjs/loader:1944:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:2084:10)
+    at Module.load (node:internal/modules/cjs/loader:1666:32)
+    at Module._load (node:internal/modules/cjs/loader:1447:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:260:19)
+    at Module.require (node:internal/modules/cjs/loader:1689:12)
+    at require (node:internal/modules/helpers:191:16)
+
+Node.js v26.4.0

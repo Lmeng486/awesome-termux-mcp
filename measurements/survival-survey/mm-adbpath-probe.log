@@ -1,0 +1,47 @@
+----------------------------------------------------------------
+[ENV]
+node: v26.4.0
+HOME=/data/data/com.termux/files/home
+platform/homedir: android | /data/data/com.termux/files/home
+ANDROID_HOME=<unset>
+PATH=/data/data/com.termux/files/usr/bin
+----------------------------------------------------------------
+[STEP 1] does /usr exist at all? (Termux is an FHS variant; prefix is /data/data/com.termux/files/usr)
+ls: cannot access '/usr': No such file or directory
+ls: cannot access '/usr/bin': No such file or directory
+ls: cannot access '/usr/local': No such file or directory
+ls: cannot access '/usr/local/bin': No such file or directory
+----------------------------------------------------------------
+[STEP 2] candidate list as computed by mobile-use getPotentialADBPaths() else-branch
+  MISSING  /usr/local/bin/adb
+  MISSING  /usr/bin/adb
+  MISSING  /data/data/com.termux/files/home/android-sdk/platform-tools/adb
+----------------------------------------------------------------
+[STEP 3] baseline run, no workaround
+  EXIT=1  stderr_bytes=1072
+  | /data/data/com.termux/files/home/survival/mobilemcp2/node_modules/mobile-use/dist/index.js:214
+  |       throw new Error(
+  |       ^
+  | 
+  | Error: ADB not found. Please ensure Android SDK is installed and properly configured.
+  |     at ADBClient.getAdbPath (/data/data/com.termux/files/home/survival/mobilemcp2/node_modules/mobile-use/dist/index.js:214:13)
+----------------------------------------------------------------
+[STEP 4] apply workaround: create /data/data/com.termux/files/home/android-sdk/platform-tools/adb -> /data/data/com.termux/files/usr/bin/adb
+  lrwxrwxrwx. 1 u0_a394 u0_a394 39 Oct 27 10:59 /data/data/com.termux/files/home/android-sdk/platform-tools/adb -> /data/data/com.termux/files/usr/bin/adb
+----------------------------------------------------------------
+[STEP 5] rerun with only the symlink in place (ANDROID_HOME still unset)
+  EXIT=0  stderr_bytes=0
+----------------------------------------------------------------
+[STEP 6] remove workaround, rerun to prove reversibility
+  EXIT=1  stderr_bytes=1072
+  | /data/data/com.termux/files/home/survival/mobilemcp2/node_modules/mobile-use/dist/index.js:214
+  |       throw new Error(
+  |       ^
+  | 
+----------------------------------------------------------------
+[VERDICT] baseline EXIT=1 / with-symlink EXIT=0 / after-cleanup EXIT=1
+  stdin is /dev/null, so a successfully started server reads EOF and exits cleanly:
+    EXIT=0  -> module load + ADBClient construction succeeded (no throw), handshake reachable
+    EXIT=1  -> threw during module load, server never started
+    EXIT=124 -> survived the 8s timeout (still running), also means no throw
+----------------------------------------------------------------
