@@ -170,11 +170,11 @@ Conclusion: for context budgeting on edge devices, use a real tokenizer and repo
 
 nano-mcp-termux runs natively with 4 tools at 16,064 KB RSS — roughly 2.4× lighter than github-mcp-server's 38 MB — while carrying the same JSON-RPC surface. It hits none of the failure classes observed above (no postinstall scripts → no F1; no native binaries → no F7; no desktop path assumptions → no F6/F8; no platform switches at import → no F9). The survey's failures are not "Android is hostile"; they are specific, avoidable engineering assumptions that happen to be invisible on the machines the servers were developed on.
 
-## 6. Draft upstream issues (NOT sent — pending author review)
+## 6. Draft upstream issues (one sent, one pending — see per-draft status)
 
-Per the survey protocol, nothing goes upstream without the repo owner reading it first. Two drafts prepared:
+Per the survey protocol, nothing goes upstream without the repo owner reading it first. Draft A was **sent on 2026-10-27** as a comment on [microsoft/playwright#41942](https://github.com/microsoft/playwright/pull/41942#issuecomment-6433075366); Draft B is prepared and **not yet sent**.
 
-### Draft A — playwright/mcp: "Server crashes at module evaluation on Android: 'Unsupported platform: android' (residual path after #41942; workaround available)"
+### Draft A — playwright/playwright (comment on PR #41942, sent 2026-10-27): "Server crashes at module evaluation on Android: 'Unsupported platform: android' (residual path after #41942; workaround available)"
 
 > **Summary:** `@playwright/mcp` (0.0.83, running `playwright-core` 1.64.0-alpha-1790635538000) crashes during **module evaluation** on Android/Termux (aarch64, Node v26.4.0) with `Error: Unsupported platform: android`. The eager class-field initializer IIFE for `registryDirectory` (`coreBundle.js:34353`) runs at load time; with `PLAYWRIGHT_BROWSERS_PATH` unset it takes the `else` branch → `defaultRegistryDirectory()` (:33910) → `defaultCacheDirectory()` (:33907) → `computeDefaultCacheDirectory()` (:33904), whose platform switch has no `android` branch and throws — before any JSON-RPC traffic. This is a **residual path**: PR #41942 (commit `3e14efd6`, fixing #41852) made `defaultCacheDirectory()` lazy (`??=`), but the `registryDirectory` initializer remains eager, so that fix covers one of the two call paths only. The crash reproduces on a build fetched more than two months after the fix commit.
 >
