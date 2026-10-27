@@ -1,0 +1,17 @@
+/data/data/com.termux/files/home/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core/lib/coreBundle.js:17
+    throw err = [e], e;
+    ^
+
+Error: Unsupported platform: android
+    at computeDefaultCacheDirectory (/data/data/com.termux/files/home/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core/lib/coreBundle.js:33904:9)
+    at defaultCacheDirectory (/data/data/com.termux/files/home/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core/lib/coreBundle.js:33907:37)
+    at defaultRegistryDirectory (/data/data/com.termux/files/home/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core/lib/coreBundle.js:33910:37)
+    at /data/data/com.termux/files/home/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core/lib/coreBundle.js:34361:19
+    at packages/playwright-core/src/server/registry/index.ts (/data/data/com.termux/files/home/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core/lib/coreBundle.js:34366:7)
+    at __init (/data/data/com.termux/files/home/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core/lib/coreBundle.js:15:58)
+    at packages/playwright-core/src/server/launchApp.ts (/data/data/com.termux/files/home/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core/lib/coreBundle.js:35201:5)
+    at __init (/data/data/com.termux/files/home/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core/lib/coreBundle.js:15:58)
+    at packages/playwright-core/src/server/recorder/recorderApp.ts (/data/data/com.termux/files/home/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core/lib/coreBundle.js:52297:5)
+    at __init (/data/data/com.termux/files/home/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core/lib/coreBundle.js:15:58)
+
+Node.js v26.4.0

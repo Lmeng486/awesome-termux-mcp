@@ -1,0 +1,6 @@
+retest date: 2026-10-27
+@playwright/mcp: 0.0.83 (npx latest)
+playwright-core (npx cache): 1.64.0-alpha-1790635538000 (built ~2026-09-29, post-#41942)
+node: v26.4.0
+device: Xiaomi 23013RK75C, Android 15 (SDK 35), aarch64
+scenario matrix: bare=crash | PLAYWRIGHT_BROWSERS_PATH=0=25 tools | PLAYWRIGHT_BROWSERS_PATH=$HOME/pw-browsers=25 tools
