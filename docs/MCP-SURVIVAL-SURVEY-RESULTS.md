@@ -72,6 +72,8 @@ Under proot Ubuntu 24.04 the same binary runs untouched: L0 ✅, L1 ✅ (46 tool
 
 ### Card 5 — mobile-mcp (9 tools) ⚠️ (L2 pending user pairing)
 
+*(Attribution note: this Card is npm `mobile-mcp` = `runablehq/mobile-mcp` + `runablehq/mobile-use`. It is **not** `@mobilenext/mobile-mcp` / `mobile-next/mobile-mcp`, a different project that only shares the npm name. See §6 Draft B.)*
+
 Four-level failure chain, each level individually diagnosed and worked around:
 
 1. `esbuild` postinstall script blocked by npm config → **F1/F7** (install-time platform assumption).
@@ -170,9 +172,9 @@ Conclusion: for context budgeting on edge devices, use a real tokenizer and repo
 
 nano-mcp-termux runs natively with 4 tools at 16,064 KB RSS — roughly 2.4× lighter than github-mcp-server's 38 MB — while carrying the same JSON-RPC surface. It hits none of the failure classes observed above (no postinstall scripts → no F1; no native binaries → no F7; no desktop path assumptions → no F6/F8; no platform switches at import → no F9). The survey's failures are not "Android is hostile"; they are specific, avoidable engineering assumptions that happen to be invisible on the machines the servers were developed on.
 
-## 6. Draft upstream issues (one sent, one pending — see per-draft status)
+## 6. Draft upstream issues (one sent, one withdrawn — see per-draft status)
 
-Per the survey protocol, nothing goes upstream without the repo owner reading it first. Draft A was **sent on 2026-10-27** as a comment on [microsoft/playwright#41942](https://github.com/microsoft/playwright/pull/41942#issuecomment-6433075366); Draft B is prepared and **not yet sent**.
+Per the survey protocol, nothing goes upstream without the repo owner reading it first. Draft A was **sent on 2026-10-27** as a comment on [microsoft/playwright#41942](https://github.com/microsoft/playwright/pull/41942#issuecomment-6433075366); Draft B was **withdrawn before sending** — a pre-send repo check found it attributed to the wrong repository (see below).
 
 ### Draft A — playwright/playwright (comment on PR #41942, sent 2026-10-27): "Server crashes at module evaluation on Android: 'Unsupported platform: android' (residual path after #41942; workaround available)"
 
@@ -188,35 +190,29 @@ Per the survey protocol, nothing goes upstream without the repo owner reading it
 >
 > **Suggestion:** any of — (a) treat an explicitly-set `PLAYWRIGHT_BROWSERS_PATH` as "platform handled by the user" before the platform switch throws (a one-line guard in the `registryDirectory` initializer); (b) make the `registryDirectory` initializer lazy the same way #41942 did for `defaultCacheDirectory()`, so the fix covers both call paths; (c) add an `android` branch to the platform map. Happy to send the full stack trace and environment details; artifacts are hash-anchored and reproducible.
 
-### Draft B — mobile-next/mobile-mcp: "ADB path resolution never consults `PATH` on Android/Termux, and `ANDROID_HOME` doesn't help (one workaround applied, one open)"
+### Draft B — withdrawn before sending (misattributed repository): "ADB path resolution never consults `PATH` on Android/Termux"
 
-> **Summary:** installing and launching `mobile-mcp` on Android 15 / Termux (aarch64, node v26.4.0, npm 11.20.0) hits four independent failures:
-> 1. `esbuild` postinstall script blocked by npm config;
-> 2. nested `sharp` attempts a wasm32 build and crashes (bypassed by renaming the nested copy);
-> 3. ADB path resolution hardcodes a desktop layout **and never scans `PATH`** (bypassed by making one hardcoded candidate exist — see below);
-> 4. `adb` daemon rejects the default `TMPDIR` (open — observed on device, no standalone log captured yet; needs a real wireless-debugging pairing to reproduce and attach evidence).
+> **Status: withdrawn 2026-10-27 — never sent.** The findings below are real and reproducible on device, but a pre-send repo check proved they were attributed to the wrong project. It is recorded here instead of shipped, because the intended target can refute the whole thing in one line.
 >
-> Items (1)–(2) are generic npm/native-build friction rather than Android-specific; the Android-specific core of this report is (3)–(4).
+> **What the bug actually is.** On Android, `process.platform === "android"`. The `getPotentialADBPaths()` helper branches on `win32` / `darwin` / `linux` and falls through to an `else` that returns exactly three candidates — `/usr/local/bin/adb`, `/usr/bin/adb`, `$HOME/android-sdk/platform-tools/adb` — plus an `ANDROID_HOME`-derived entry when that variable is set. None of these is discovered via `PATH`, and there is no `PATH` scan anywhere in the function. `getAdbPath()` then does `paths.find(p => existsSync(p))` and throws `"ADB not found. Please ensure Android SDK is installed and properly configured."` when every candidate misses. Termux is an FHS variant where `/usr`, `/usr/bin`, `/usr/local` and `/usr/local/bin` do not exist, so only the third candidate is even reachable. The `ADBClient` constructor accepts `options.adbPath` and skips resolution when it is present, but the shipped server constructs it with zero arguments (`new ADBClient()`), so the escape hatch is unreachable. All four claims were verified against the published sources and are reproducible with `mm-adbpath-probe.sh` (reversible A/B, `EXIT=1 -> 0 -> 1`, hash-anchored) — the local evidence is sound.
 >
-> **Detail on (3), because the obvious fix does not work.** On Android, `process.platform === "android"`, so every branch of `getPotentialADBPaths()` except the `else` misses. The `else` branch returns exactly three candidates: `/usr/local/bin/adb`, `/usr/bin/adb`, `$HOME/android-sdk/platform-tools/adb` — plus an `ANDROID_HOME`-derived entry when that variable is set. Two things follow:
->
-> - Termux is an FHS variant: `/usr`, `/usr/bin`, `/usr/local` and `/usr/local/bin` **do not exist**. So the first two candidates are physically impossible there.
-> - The candidate list is a fixed array handed to `existsSync()`; there is **no `PATH` lookup anywhere**. `adb` is installed and working on `PATH` (`$PREFIX/bin/adb`), and that buys nothing.
->
-> I verified this with a reversible A/B on device (`mm-adbpath-probe.sh`, transcript `mm-adbpath-probe.log`, both hash-anchored). Exactly one variable changes — whether `$HOME/android-sdk/platform-tools/adb` exists. `ANDROID_HOME` is `<unset>` throughout, so this is *not* the "fake `ANDROID_HOME`" trick:
+> **Why it was withdrawn: the code belongs to a different project.** The package under test is npm `mobile-mcp`, whose manifest points at **`runablehq/mobile-mcp`**, and it depends on **`runablehq/mobile-use`** — and `mobile-use` is the module that actually contains `getPotentialADBPaths()` / `ADBClient` (throw site, captured: `mobile-use/dist/index.js:214`). The draft was addressed to **`mobile-next/mobile-mcp`** (npm `@mobilenext/mobile-mcp`), a *different* project that merely shares the npm name. GitHub's path-history API proves the target repo never held the accused files — not "refactored away", never there:
 >
 > ```
-> [STEP 3] baseline, no workaround        EXIT=1  stderr_bytes=1072  (Error: ADB not found…)
-> [STEP 4] ln -s $PREFIX/bin/adb  $HOME/android-sdk/platform-tools/adb
-> [STEP 5] rerun, only the symlink added  EXIT=0  stderr_bytes=0
-> [STEP 6] rm the symlink, rerun          EXIT=1  stderr_bytes=1072
+> GET /repos/mobile-next/mobile-mcp/commits?path=<file>
+>   dist/mcp_server.js   -> 0 commits   (never existed)
+>   src/adb_client.ts    -> 0 commits   (never existed)
+>   src/adb.ts           -> 0 commits   (never existed)
+>   src/android.ts       -> 3 commits
 > ```
 >
-> Failure is deterministic, the bypass is purely filesystem-level, and it is fully reversible. After (1)–(3) the server installs and lists all 9 tools.
+> The two lines diverge in every other respect too. `mobile-mcp` (runablehq): 68 stars, MIT, dormant since 2025-04-02. `@mobilenext/mobile-mcp` (mobile-next): 10k+ stars, Apache-2.0, actively pushed (2026-10-26, 63 open issues) and depending on `mobilewright`, not `mobile-use`. Its current `src/android.ts` `getAdbPath()` fallthrough is `return exeName` (bare `"adb"`), i.e. it *does* consult `PATH` — the exact opposite of this draft's headline claim. Sent as written, the draft would have drawn a one-line "we do not have that file" and cost the survey its credibility.
 >
-> **Suggested fix (small):** expose the existing `adbPath` option all the way up. `ADBClient` already accepts `options.adbPath` and skips resolution entirely when it is present, but `dist/mcp_server.js` constructs it with zero arguments (`new ADBClient()`), so the escape hatch is unreachable from the shipped server — roughly a two-line change (read `process.env.ADB_PATH` or an `--adb-path` flag in `mcp_server.js` and pass it through). A secondary hardening would be to append a `PATH` scan to `getPotentialADBPaths()`, since on Android/Termux that is where `adb` actually lives.
+> **Methodology lesson (the third time this check has paid off).** Draft A's pre-send check avoided a stale/closed thread. The first Draft B check avoided accusing a function that had already been refactored. This one caught **an accusation pointed at the wrong repository entirely**. Reusable rule: **before any upstream report, verify the target repo's history actually contains the accused code path** — `GET /repos/{owner}/{repo}/commits?path=<file>` returning `[]` means the file never existed there, which voids the attribution no matter how clean the local repro is. A local repro proves the bug is real; it does **not** prove the bug is *theirs*.
 >
-> Full failure chain, commands and logs available; happy to open a PR for the `adbPath` plumbing if the maintainers want it.
+> **What is preserved.** The raw artifacts stay — they are honest measurements of the `mobile-mcp` / `mobile-use` line: `mm-adbpath-probe.sh` (2,540 B, sha256 `9fc35379f239…`) + `mm-adbpath-probe.log` (2,751 B, sha256 `9444dfdfc582…`), and `mm-bare-crash.log` (1,055 B, sha256 `196a98674cf0…`). Item (4) of Card 5 — the `adb` daemon rejecting the default `TMPDIR` — is independent of repo attribution and remains open.
+>
+> **If ever revived:** the correct destination is `runablehq/mobile-use` (or `runablehq/mobile-mcp`). Its issue channel is clean (0 existing reports for `adb` / `termux` / `ANDROID_HOME`) but both repos have been dormant ~1.5 years, so a report there would likely go unanswered. Deliberately not sent.
 
 ## Reproduce
 
