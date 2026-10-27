@@ -1,0 +1,22 @@
+{
+  "cmd": [
+    "node",
+    "node_modules/mobile-mcp/dist/index.js"
+  ],
+  "handshake": "PASS",
+  "protocol_version": "2025-11-25",
+  "server_info": {
+    "name": "Mobile MCP",
+    "version": "0.0.7"
+  },
+  "tools_count": 9,
+  "next_cursor": false,
+  "tools_list_bytes": 3031,
+  "chars4_tokens": 757,
+  "peak_rss_kb": 115600,
+  "call": null,
+  "stderr_tail": [
+    "Mobile use mcp server is running."
+  ],
+  "notes": []
+}

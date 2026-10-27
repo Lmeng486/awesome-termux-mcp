@@ -1,0 +1,263 @@
+{
+ "ctx7": {
+  "file_bytes": 5237,
+  "sha256": "3b969ad30865689c",
+  "compact_bytes": 5231,
+  "result_only_bytes": 5221,
+  "tools": 2,
+  "whole": {
+   "qwen25": 1146,
+   "gpt2": 1245,
+   "chars4": 1307
+  },
+  "result_only": {
+   "qwen25": 1145,
+   "gpt2": 1244,
+   "chars4": 1304
+  },
+  "sum_per_tool": {
+   "qwen25": 1143,
+   "gpt2": 1242
+  },
+  "mean_per_tool": {
+   "qwen25": 571.5,
+   "gpt2": 621.0
+  },
+  "heaviest": [
+   [
+    "resolve-library-id",
+    {
+     "bytes": 3038,
+     "qwen25": 651,
+     "gpt2": 709,
+     "chars4": 759
+    }
+   ],
+   [
+    "query-docs",
+    {
+     "bytes": 2180,
+     "qwen25": 492,
+     "gpt2": 533,
+     "chars4": 544
+    }
+   ]
+  ]
+ },
+ "fc": {
+  "file_bytes": 85522,
+  "sha256": "1b9602412a62c0a6",
+  "compact_bytes": 85515,
+  "result_only_bytes": 85505,
+  "tools": 26,
+  "whole": {
+   "qwen25": 19248,
+   "gpt2": 20862,
+   "chars4": 21378
+  },
+  "result_only": {
+   "qwen25": 19247,
+   "gpt2": 20861,
+   "chars4": 21376
+  },
+  "sum_per_tool": {
+   "qwen25": 19245,
+   "gpt2": 20859
+  },
+  "mean_per_tool": {
+   "qwen25": 740.2,
+   "gpt2": 802.3
+  },
+  "heaviest": [
+   [
+    "firecrawl_scrape",
+    {
+     "bytes": 10952,
+     "qwen25": 2351,
+     "gpt2": 2532,
+     "chars4": 2738
+    }
+   ],
+   [
+    "firecrawl_search",
+    {
+     "bytes": 10098,
+     "qwen25": 2271,
+     "gpt2": 2476,
+     "chars4": 2524
+    }
+   ],
+   [
+    "firecrawl_agent",
+    {
+     "bytes": 7026,
+     "qwen25": 1791,
+     "gpt2": 1908,
+     "chars4": 1756
+    }
+   ]
+  ]
+ },
+ "pw": {
+  "file_bytes": 20296,
+  "sha256": "3b694e92d2c44032",
+  "compact_bytes": 20296,
+  "result_only_bytes": 20286,
+  "tools": 25,
+  "whole": {
+   "qwen25": 4397,
+   "gpt2": 4834,
+   "chars4": 5074
+  },
+  "result_only": {
+   "qwen25": 4396,
+   "gpt2": 4833,
+   "chars4": 5072
+  },
+  "sum_per_tool": {
+   "qwen25": 4394,
+   "gpt2": 4831
+  },
+  "mean_per_tool": {
+   "qwen25": 175.8,
+   "gpt2": 193.2
+  },
+  "heaviest": [
+   [
+    "browser_take_screenshot",
+    {
+     "bytes": 1629,
+     "qwen25": 334,
+     "gpt2": 362,
+     "chars4": 407
+    }
+   ],
+   [
+    "browser_emulate_media",
+    {
+     "bytes": 1197,
+     "qwen25": 278,
+     "gpt2": 301,
+     "chars4": 299
+    }
+   ],
+   [
+    "browser_fill_form",
+    {
+     "bytes": 1154,
+     "qwen25": 250,
+     "gpt2": 274,
+     "chars4": 288
+    }
+   ]
+  ]
+ },
+ "mm": {
+  "file_bytes": 3031,
+  "sha256": "0ea72a98662253df",
+  "compact_bytes": 3031,
+  "result_only_bytes": 3021,
+  "tools": 9,
+  "whole": {
+   "qwen25": 681,
+   "gpt2": 775,
+   "chars4": 758
+  },
+  "result_only": {
+   "qwen25": 680,
+   "gpt2": 774,
+   "chars4": 755
+  },
+  "sum_per_tool": {
+   "qwen25": 678,
+   "gpt2": 780
+  },
+  "mean_per_tool": {
+   "qwen25": 75.3,
+   "gpt2": 86.7
+  },
+  "heaviest": [
+   [
+    "mobile_swipe",
+    {
+     "bytes": 488,
+     "qwen25": 112,
+     "gpt2": 124,
+     "chars4": 122
+    }
+   ],
+   [
+    "mobile_tap",
+    {
+     "bytes": 364,
+     "qwen25": 85,
+     "gpt2": 96,
+     "chars4": 91
+    }
+   ],
+   [
+    "mobile_key_press",
+    {
+     "bytes": 329,
+     "qwen25": 80,
+     "gpt2": 93,
+     "chars4": 82
+    }
+   ]
+  ]
+ },
+ "gh": {
+  "file_bytes": 126642,
+  "sha256": "8b57d0192ca082cc",
+  "compact_bytes": 126642,
+  "result_only_bytes": 126600,
+  "tools": 46,
+  "whole": {
+   "qwen25": 60806,
+   "gpt2": 64445,
+   "chars4": 31660
+  },
+  "result_only": {
+   "qwen25": 60795,
+   "gpt2": 64433,
+   "chars4": 31650
+  },
+  "sum_per_tool": {
+   "qwen25": 60793,
+   "gpt2": 64431
+  },
+  "mean_per_tool": {
+   "qwen25": 1321.6,
+   "gpt2": 1400.7
+  },
+  "heaviest": [
+   [
+    "issue_write",
+    {
+     "bytes": 5768,
+     "qwen25": 2164,
+     "gpt2": 2304,
+     "chars4": 1442
+    }
+   ],
+   [
+    "list_issues",
+    {
+     "bytes": 4350,
+     "qwen25": 1883,
+     "gpt2": 1994,
+     "chars4": 1088
+    }
+   ],
+   [
+    "pull_request_read",
+    {
+     "bytes": 4518,
+     "qwen25": 1864,
+     "gpt2": 1967,
+     "chars4": 1130
+    }
+   ]
+  ]
+ }
+}

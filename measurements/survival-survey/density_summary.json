@@ -1,0 +1,82 @@
+{
+ "ctx7": {
+  "tools": 2,
+  "chars": 5214,
+  "desc_chars": 4314,
+  "desc_pct": 82.7,
+  "kw_count": 22,
+  "kw_chars_pct": 4.0,
+  "per_kb": {
+   "$schema": 0.4,
+   "enum": 0.0,
+   "required": 0.4,
+   "additionalProperties": 0.0,
+   "properties": 0.4,
+   "type": 1.4
+  }
+ },
+ "fc": {
+  "tools": 26,
+  "chars": 85475,
+  "desc_chars": 39594,
+  "desc_pct": 46.3,
+  "kw_count": 1557,
+  "kw_chars_pct": 17.4,
+  "per_kb": {
+   "$schema": 0.6,
+   "enum": 0.6,
+   "required": 0.6,
+   "additionalProperties": 1.3,
+   "properties": 1.2,
+   "type": 7.7
+  }
+ },
+ "gh": {
+  "tools": 46,
+  "chars": 126553,
+  "desc_chars": 25542,
+  "desc_pct": 20.2,
+  "kw_count": 916,
+  "kw_chars_pct": 6.7,
+  "per_kb": {
+   "$schema": 0.0,
+   "enum": 0.3,
+   "required": 0.4,
+   "additionalProperties": 0.0,
+   "properties": 0.4,
+   "type": 2.7
+  }
+ },
+ "mm": {
+  "tools": 9,
+  "chars": 3011,
+  "desc_chars": 788,
+  "desc_pct": 26.2,
+  "kw_count": 58,
+  "kw_chars_pct": 20.2,
+  "per_kb": {
+   "$schema": 3.1,
+   "enum": 0.0,
+   "required": 1.7,
+   "additionalProperties": 2.0,
+   "properties": 3.1,
+   "type": 6.8
+  }
+ },
+ "pw": {
+  "tools": 25,
+  "chars": 20260,
+  "desc_chars": 8317,
+  "desc_pct": 41.1,
+  "kw_count": 364,
+  "kw_chars_pct": 18.1,
+  "per_kb": {
+   "$schema": 1.3,
+   "enum": 0.7,
+   "required": 0.9,
+   "additionalProperties": 1.4,
+   "properties": 1.3,
+   "type": 5.8
+  }
+ }
+}
